@@ -1,0 +1,91 @@
+# Tauri comparison build. Every push to the `tauri` branch builds the Tauri version of
+# My Sports Hub and publishes it as a GitHub pre-release tagged tauri-v0.1.<run number>.
+# Pre-releases are never "latest", so the Electron app's auto-updater ignores them.
+name: Build Tauri test build (Windows)
+
+on:
+  push:
+    branches: [tauri]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tauri
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Set version
+        id: ver
+        run: node scripts/ci-version-tauri.mjs
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+
+      - name: Build Tauri app
+        run: npm run tauri:build
+
+      - name: Collect files
+        id: files
+        shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+          mkdir -p out
+          cp src-tauri/target/release/bundle/nsis/*-setup.exe "out/My-Sports-Hub-Tauri-Setup-${VERSION}.exe"
+          cp src-tauri/target/release/my-sports-hub-tauri.exe "out/My-Sports-Hub-Tauri-Portable-${VERSION}.exe"
+          ls -la out
+          size() { awk -v b="$(stat -c %s "$1")" 'BEGIN { printf "%.1f MB", b / 1048576 }'; }
+          echo "setup=$(size out/My-Sports-Hub-Tauri-Setup-${VERSION}.exe)" >> "$GITHUB_OUTPUT"
+          echo "portable=$(size out/My-Sports-Hub-Tauri-Portable-${VERSION}.exe)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          cat > notes.md <<EOF
+          **Tauri test build** of My Sports Hub (commit ${GITHUB_SHA::7}), for comparing against the Electron app. It installs separately as "My Sports Hub Tauri", so both can be installed side by side.
+
+          | File | Size |
+          |---|---|
+          | Setup | ${{ steps.files.outputs.setup }} |
+          | Portable | ${{ steps.files.outputs.portable }} |
+
+          Differences from the Electron app: no auto-update (Settings → Check now links to the newest Tauri build), the standard Windows title bar, and its own settings and starred teams.
+          EOF
+          gh release create "tauri-v${VERSION}" out/*.exe \
+            --target "${GITHUB_SHA}" \
+            --title "My Sports Hub Tauri ${VERSION} (test build)" \
+            --notes-file notes.md \
+            --prerelease \
+            --latest=false
+
+      - name: Keep build files
+        uses: actions/upload-artifact@v5
+        with:
+          name: My-Sports-Hub-Tauri-${{ steps.ver.outputs.version }}
+          path: out/*.exe

@@ -1,0 +1,25 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the My Sports Hub UI is allowed to do",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-request-user-attention",
+    "core:window:allow-is-focused",
+    "opener:default",
+    "notification:default",
+    "window-state:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://site.api.espn.com/*" },
+        { "url": "https://site.web.api.espn.com/*" },
+        { "url": "https://sports.core.api.espn.com/*" },
+        { "url": "https://api.squiggle.com.au/*" },
+        { "url": "https://api.github.com/repos/Breaddles00/my-sports-hub/*" }
+      ]
+    }
+  ]
+}
