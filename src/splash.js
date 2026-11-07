@@ -1,4 +1,4 @@
-// Called from the main process via executeJavaScript.
+// Launch splash. src-tauri/src/updater.rs calls window.setStatus() through WebviewWindow::eval.
 window.setStatus = (status, percent, sub) => {
   document.getElementById('status').textContent = status;
   document.getElementById('sub').textContent = sub || '';

@@ -17,8 +17,7 @@
         { "url": "https://site.api.espn.com/*" },
         { "url": "https://site.web.api.espn.com/*" },
         { "url": "https://sports.core.api.espn.com/*" },
-        { "url": "https://api.squiggle.com.au/*" },
-        { "url": "https://api.github.com/repos/Breaddles00/my-sports-hub/*" }
+        { "url": "https://api.squiggle.com.au/*" }
       ]
     }
   ]

@@ -1,42 +1,37 @@
 # My Sports Hub
 
-A Windows 11 desktop app (React + Electron) with live scores, schedules, standings, box scores, rosters and news for:
+A Windows 11 desktop app (React + [Tauri 2](https://v2.tauri.app)) with live scores, schedules, standings, box scores, rosters and news for:
 
 **NFL · NCAA Football (FBS) · MLB · NBA · NHL · AFL**
 
 ## Install
 
-**Easiest:** download **`My-Sports-Hub-Setup-x.x.x.exe`** from the [latest release](https://github.com/Breaddles00/my-sports-hub/releases/latest) and run it. It adds My Sports Hub to the Start menu and Desktop. You don't need to install anything else.
+Download **`My-Sports-Hub-Setup-x.x.x.exe`** from the [latest release](https://github.com/Breaddles00/my-sports-hub/releases/latest) and run it (about 2 MB). It installs for your user only, adds My Sports Hub to the Start menu and Desktop, and needs nothing else. Double-clicking **`Setup My Sports Hub.bat`** in this repo downloads and runs the same installer.
 
 Windows SmartScreen may warn about an "unknown publisher" because the app isn't code-signed. Click **More info → Run anyway**.
 
-A **`My-Sports-Hub-Portable-x.x.x.exe`** that runs without installing is also attached to each release.
-
-### Build it yourself (optional)
-
-Clone or download this repo and double-click **`Setup My Sports Hub.bat`**. It installs Node.js if needed, builds the app and runs the installer. **`Run My Sports Hub.bat`** runs the app straight from the folder.
+A **`My-Sports-Hub-Portable-x.x.x.exe`** that runs without installing is also attached to each release. It needs the Microsoft Edge WebView2 runtime, which Windows 11 already has.
 
 ## Automatic updates
 
-Each time it starts, My Sports Hub shows a small splash screen and checks this GitHub repo for a newer version. If it finds one, it updates before opening.
+Each time it starts, My Sports Hub shows a small splash screen and checks this repo's latest GitHub Release. If there's a newer version, it updates before opening.
 
 | How you run it | What happens when there's an update |
 |---|---|
-| Installed with the Setup `.exe` | Downloads the new installer from Releases, installs it silently and reopens on the new version |
-| From a `git clone` of this repo | Runs `git pull`, reinstalls packages if they changed, rebuilds and reopens |
-| Portable `.exe` or a downloaded copy of the folder | Shows a banner with a link to download the new version |
+| Installed with the Setup `.exe` | Downloads the new installer, checks its SHA-256 against the one GitHub publishes, installs it (a progress bar, no questions) and reopens on the new version |
+| Portable `.exe` | Shows a banner with a link to download the new version |
 
-If GitHub can't be reached within about 8 seconds (for example, when you're offline), the app opens normally. **Settings → Updates → Check now** runs the check on demand. To skip it once, launch with `--skip-update-check`.
+If GitHub can't be reached within about 8 seconds (for example, when you're offline), the app opens normally. **Settings → Updates → Check now** runs the check on demand. To skip it once, launch with `--skip-update-check` (or set `MSH_SKIP_UPDATE=1`).
 
 ### How releases are made
 
 Every push to `main` (except README-only changes) runs the **Build & release Windows app** GitHub Action. It:
 
-1. stamps the version as `1.0.<run number>`, so each push is newer than the last,
-2. builds the installer and portable app on Windows,
-3. publishes them as a GitHub Release with `latest.yml`, which the updater reads.
+1. stamps the version as `1.1.<run number>`, so each push is newer than the last,
+2. builds the app, the installer and the portable exe on Windows,
+3. publishes them as the latest GitHub Release, which the updater reads.
 
-To start a new minor or major version, change `"version"` in `package.json` (e.g. `1.1.0`). The run number is still added as the patch number.
+To start a new minor or major version, change `"version"` in `package.json` (e.g. `1.2.0`); `src-tauri/tauri.conf.json` reads it from there. The run number is still added as the patch number.
 
 ## Features
 
@@ -47,7 +42,7 @@ To start a new minor or major version, change `"version"` in `package.json` (e.g
 - **Game centre**: line score, win-probability chart, leaders, scoring summary, full box score, team stats, play-by-play or drives, and game info.
 - **Standings**, **Teams** (schedule, results and roster with injuries) and **News**.
 - **Follow teams (☆)**: Windows notifications at kick-off, on every score, and at full time.
-- Dark and light themes, native Windows 11 title bar, and times in your local time zone.
+- Dark and light themes, the standard Windows 11 title bar, and times in your local time zone.
 - Keyboard: `F5` refresh · `H` home · `S` starred · `1`–`6` leagues · `Esc` close panel · `F12` dev tools.
 
 ## Data
@@ -56,22 +51,25 @@ Data comes from ESPN's public JSON feeds (`site.api.espn.com`). They're free and
 
 ## Development
 
+Building needs [Node.js](https://nodejs.org) and [Rust](https://rustup.rs) with the Visual Studio C++ build tools ([Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)).
+
 ```bash
 npm install
-npm start              # build the UI and launch (runs the update check)
-npm run start:no-update
-npm run dist           # build installer + portable exe into release/ (no publishing)
+npm run dev            # build the UI and run the app (debug build, skips installing updates)
+npm run dist           # release build: src-tauri/target/release/ and the installer in bundle/nsis/
 ```
 
 ```
-electron/main.js       window, secure HTTP bridge, shortcuts
-electron/updater.js    launch-time update check (GitHub Releases / git pull)
-electron/splash.*      "Checking for updates…" splash window
-electron/preload.js    safe API exposed to the UI
-src/api.js             ESPN/Squiggle fetching + normalisation
-src/leagues.js         league config (add more leagues here)
-src/store.jsx          settings, favourites, live polling
-src/components/        Home, Starred, Scoreboard, GameCard, GameDetail, Standings, Teams, News, Settings
-scripts/build.mjs      esbuild bundler for the React UI
-scripts/ci-version.mjs CI version stamping
+src-tauri/src/main.rs        window, single instance, saved window state, plugins
+src-tauri/src/updater.rs     launch-time update check + splash, "Check now"
+src-tauri/capabilities/      what the UI may do, including the HTTP host allow-list
+src-tauri/tauri.conf.json    app name, window, installer settings
+src/tauri-api.js             window.api bridge for the UI (HTTP, links, notifications, updates)
+src/splash.*                 "Checking for updates…" splash
+src/api.js                   ESPN/Squiggle fetching + normalisation
+src/leagues.js               league config (add more leagues here)
+src/store.jsx                settings, favourites, live polling
+src/components/              Home, Starred, Scoreboard, GameCard, GameDetail, Standings, Teams, News, Settings
+scripts/build.mjs            esbuild bundler for the UI (into dist/)
+scripts/ci-version.mjs       CI version stamping
 ```

@@ -1,75 +1,23 @@
 {
   "name": "my-sports-hub",
   "productName": "My Sports Hub",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "My Sports Hub — live scores, schedules, standings and stats for NFL, NCAA Football, MLB, NBA, NHL and AFL.",
-  "main": "electron/main.js",
   "author": "Breaddles00",
   "license": "MIT",
   "private": true,
   "scripts": {
-    "build:renderer": "node scripts/build.mjs",
-    "start": "npm run build:renderer && electron .",
-    "start:no-update": "npm run build:renderer && electron . --skip-update-check",
-    "dist": "npm run build:renderer && electron-builder --win --publish never",
-    "shortcuts": "electron . --create-shortcuts",
-    "build:tauri-ui": "node scripts/build.mjs --tauri",
-    "tauri:dev": "npm run build:tauri-ui && tauri dev",
-    "tauri:build": "npm run build:tauri-ui && tauri build"
+    "build:ui": "node scripts/build.mjs",
+    "dev": "npm run build:ui && tauri dev",
+    "dist": "npm run build:ui && tauri build"
   },
   "dependencies": {
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "electron-updater": "^6.3.9"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "electron": "^38.0.0",
-    "electron-builder": "^26.0.12",
-    "esbuild": "^0.25.0",
-    "@tauri-apps/cli": "^2.0.0"
-  },
-  "build": {
-    "appId": "com.mysportshub.desktop",
-    "productName": "My Sports Hub",
-    "directories": {
-      "output": "release",
-      "buildResources": "build"
-    },
-    "files": [
-      "electron/**/*",
-      "dist/**/*",
-      "build/icon.png",
-      "build/icon.ico",
-      "package.json"
-    ],
-    "win": {
-      "icon": "build/icon.ico",
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "My Sports Hub",
-      "runAfterFinish": true,
-      "artifactName": "My-Sports-Hub-Setup-${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "My-Sports-Hub-Portable-${version}.${ext}"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "Breaddles00",
-        "repo": "my-sports-hub",
-        "releaseType": "release"
-      }
-    ]
+    "@tauri-apps/cli": "^2.0.0",
+    "esbuild": "^0.25.0"
   },
   "repository": {
     "type": "git",

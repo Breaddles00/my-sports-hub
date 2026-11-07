@@ -1,6 +1,6 @@
-# Every push to main builds the Windows app and publishes it as a GitHub Release
-# (v1.0.<run number>). Installed copies of My Sports Hub check for this release at
-# launch and update themselves automatically.
+# Every push to main builds the Windows app (Tauri) and publishes it as a GitHub Release
+# (v<major>.<minor>.<run number>). Installed copies of My Sports Hub check for this release at
+# launch and update themselves automatically (src-tauri/src/updater.rs).
 name: Build & release Windows app
 
 on:
@@ -28,6 +28,12 @@ jobs:
         with:
           node-version: 22
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Set version
         id: ver
         run: node scripts/ci-version.mjs
@@ -35,22 +41,26 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build installer and portable app
+      - name: Build app and installer
         run: npm run dist
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Verify auto-updater is packaged
+      - name: Collect and check files
+        id: files
         shell: bash
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          cat release/win-unpacked/resources/app-update.yml
-          grep -q "repo: my-sports-hub" release/win-unpacked/resources/app-update.yml
-          npx --yes @electron/asar list release/win-unpacked/resources/app.asar > asar.txt
-          grep -q "node_modules[\\/]electron-updater[\\/]package.json" asar.txt
-          grep -q "electron[\\/]updater.js" asar.txt
-          grep -q "electron[\\/]splash.html" asar.txt
-          echo "Auto-updater files present."
+          for f in index.html app.js splash.html splash.js icon.png; do test -f "dist/$f" || { echo "dist/$f missing"; exit 1; }; done
+          mkdir -p out
+          setup=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe)
+          case "$setup" in *"_${VERSION}_"*) ;; *) echo "Installer $setup is not version ${VERSION}"; exit 1 ;; esac
+          cp "$setup" "out/My-Sports-Hub-Setup-${VERSION}.exe"
+          cp src-tauri/target/release/my-sports-hub.exe "out/My-Sports-Hub-Portable-${VERSION}.exe"
+          ls -la out
+          size() { awk -v b="$(stat -c %s "$1")" 'BEGIN { printf "%.1f MB", b / 1048576 }'; }
+          echo "setup=$(size out/My-Sports-Hub-Setup-${VERSION}.exe)" >> "$GITHUB_OUTPUT"
+          echo "portable=$(size out/My-Sports-Hub-Portable-${VERSION}.exe)" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
         shell: bash
@@ -58,21 +68,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          ls -la release
-          gh release create "v${VERSION}" \
-            release/My-Sports-Hub-Setup-${VERSION}.exe \
-            release/My-Sports-Hub-Setup-${VERSION}.exe.blockmap \
-            release/My-Sports-Hub-Portable-${VERSION}.exe \
-            release/latest.yml \
+          cat > notes.md <<EOF
+          Automatic build of commit ${GITHUB_SHA::7}. Installed copies of My Sports Hub update to this version the next time they launch.
+
+          | File | Size |
+          |---|---|
+          | Setup | ${{ steps.files.outputs.setup }} |
+          | Portable | ${{ steps.files.outputs.portable }} |
+          EOF
+          gh release create "v${VERSION}" out/*.exe \
             --target "${GITHUB_SHA}" \
             --title "My Sports Hub ${VERSION}" \
-            --notes "Automatic build of commit ${GITHUB_SHA::7}. Installed copies of My Sports Hub update to this version the next time they launch." \
+            --notes-file notes.md \
             --latest
 
       - name: Keep build files
         uses: actions/upload-artifact@v5
         with:
           name: My-Sports-Hub-${{ steps.ver.outputs.version }}
-          path: |
-            release/*.exe
-            release/latest.yml
+          path: out/*.exe

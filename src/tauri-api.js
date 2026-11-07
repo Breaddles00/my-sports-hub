@@ -1,16 +1,14 @@
-// Tauri build only: provides the same window.api bridge that electron/preload.js gives the
-// React UI in the Electron build, so nothing in src/ has to change. Loaded before app.js.
+// window.api: the bridge between the React UI and the Tauri shell (src-tauri/). Imported first in main.jsx.
+// HTTP, links and notifications use Tauri plugins; updates are handled in Rust (src-tauri/src/updater.rs).
 (() => {
   const T = window.__TAURI__;
   if (!T) return;
 
-  const OWNER = 'Breaddles00';
-  const REPO = 'my-sports-hub';
-  const UA = 'MySportsHub-Tauri/0.1 (personal sports tracker)';
+  const UA = 'MySportsHub/1 (personal sports tracker)';
   const ALLOWED_HOSTS = new Set(['site.api.espn.com', 'site.web.api.espn.com', 'sports.core.api.espn.com', 'api.squiggle.com.au']);
   const win = T.window.getCurrentWindow();
 
-  // ---------- HTTP (same allow-list and 4 s request cache as electron/main.js) ----------
+  // ---------- HTTP (allow-listed hosts, also enforced in src-tauri/capabilities/default.json; 4 s request cache) ----------
   const cache = new Map();
   const CACHE_MS = 4000;
 
@@ -107,29 +105,9 @@
   }
   window.addEventListener('focus', () => win.requestUserAttention(null).catch(() => {}));
 
-  // ---------- updates: no auto-install in the test build, just point to the newest Tauri release ----------
-  const cmp = (a, b) => {
-    const pa = a.split('.').map(Number);
-    const pb = b.split('.').map(Number);
-    for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-    return 0;
-  };
-  async function checkForUpdates() {
-    try {
-      const list = await fetchJson(`https://api.github.com/repos/${OWNER}/${REPO}/releases?per_page=30`, {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': UA,
-      });
-      const rel = list.find((r) => !r.draft && /^tauri-v\d+\.\d+\.\d+$/.test(r.tag_name));
-      const current = await T.app.getVersion();
-      if (rel && cmp(rel.tag_name.slice(7), current) > 0) {
-        return { status: 'available', version: rel.tag_name.slice(7), url: rel.html_url, canRestart: false };
-      }
-      return { status: 'current' };
-    } catch (e) {
-      return { status: 'error', message: (e && e.message) || String(e) };
-    }
-  }
+  // ---------- updates: checked and installed by the Rust side (src-tauri/src/updater.rs) ----------
+  const invoke = (cmd) => T.core.invoke(cmd);
+  const checkForUpdates = () => invoke('check_for_updates').catch((e) => ({ status: 'error', message: String((e && e.message) || e) }));
 
   window.api = {
     platform: 'tauri', // native title bar, so the UI doesn't reserve space for caption buttons
@@ -140,8 +118,8 @@
       win.setTheme(theme === 'light' ? 'light' : 'dark').catch(() => {});
     },
     flash,
-    updateNotice: () => Promise.resolve(null),
+    updateNotice: () => invoke('update_notice'), // banner for the portable exe when a newer version exists
     checkForUpdates,
-    restartToUpdate: () => Promise.resolve(),
+    restartToUpdate: () => invoke('restart_to_update'), // relaunch; the launch check then installs the update
   };
 })();
