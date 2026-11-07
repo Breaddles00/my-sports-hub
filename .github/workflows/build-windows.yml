@@ -40,6 +40,18 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Verify auto-updater is packaged
+        shell: bash
+        run: |
+          set -e
+          cat release/win-unpacked/resources/app-update.yml
+          grep -q "repo: my-sports-hub" release/win-unpacked/resources/app-update.yml
+          npx --yes @electron/asar list release/win-unpacked/resources/app.asar > asar.txt
+          grep -q "node_modules[\\/]electron-updater[\\/]package.json" asar.txt
+          grep -q "electron[\\/]updater.js" asar.txt
+          grep -q "electron[\\/]splash.html" asar.txt
+          echo "Auto-updater files present."
+
       - name: Publish GitHub release
         shell: bash
         env:
