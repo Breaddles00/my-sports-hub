@@ -22,9 +22,9 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -35,14 +35,30 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build and publish release
-        run: npm run release
+      - name: Build installer and portable app
+        run: npm run dist
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          ls -la release
+          gh release create "v${VERSION}" \
+            release/My-Sports-Hub-Setup-${VERSION}.exe \
+            release/My-Sports-Hub-Setup-${VERSION}.exe.blockmap \
+            release/My-Sports-Hub-Portable-${VERSION}.exe \
+            release/latest.yml \
+            --target "${GITHUB_SHA}" \
+            --title "My Sports Hub ${VERSION}" \
+            --notes "Automatic build of commit ${GITHUB_SHA::7}. Installed copies of My Sports Hub update to this version the next time they launch." \
+            --latest
+
       - name: Keep build files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: My-Sports-Hub-${{ steps.ver.outputs.version }}
           path: |

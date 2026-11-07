@@ -12,8 +12,7 @@
     "start": "npm run build:renderer && electron .",
     "start:no-update": "npm run build:renderer && electron . --skip-update-check",
     "dist": "npm run build:renderer && electron-builder --win --publish never",
-    "release": "npm run build:renderer && electron-builder --win --publish always",
-    "shortcuts": "electron . --create-shortcuts"
+        "shortcuts": "electron . --create-shortcuts"
   },
   "dependencies": {
     "react": "^19.1.0",
