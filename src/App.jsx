@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { LEAGUES, LEAGUE_BY_ID } from './leagues.js';
 import { getScoreboard, openExternal } from './api.js';
 import { refreshAll, useApp, useNow, usePoll } from './store.jsx';
-import { Drawer, Tabs, timeAgo } from './components/common.jsx';
+import { Drawer, LeagueLogo, Tabs, timeAgo } from './components/common.jsx';
 import Home from './components/Home.jsx';
+import Starred from './components/Starred.jsx';
 import Scoreboard from './components/Scoreboard.jsx';
 import Standings from './components/Standings.jsx';
 import News from './components/News.jsx';
@@ -128,7 +129,7 @@ const LEAGUE_TABS = [
 ];
 
 export default function App() {
-  const { settings, drawer, closeDrawer } = useApp();
+  const { settings, favorites, drawer, closeDrawer } = useApp();
   const [view, setView] = useState(settings.startView || 'home');
   const [leagueTab, setLeagueTab] = useState('scores');
   const hub = usePoll(fetchHub, 'hub', { isLive: (d) => Object.values(d).some((x) => x.events?.some((e) => e.state === 'in')) });
@@ -137,6 +138,9 @@ export default function App() {
   const visible = LEAGUES.filter((l) => !settings.hiddenLeagues.includes(l.id));
   const liveCount = (id) => (hub.data?.[id]?.events || []).filter((e) => e.state === 'in').length;
   const totalLive = LEAGUES.reduce((n, l) => n + liveCount(l.id), 0);
+  const starredLive = LEAGUES.flatMap((l) => hub.data?.[l.id]?.events || []).filter(
+    (g) => g.state === 'in' && g.competitors.some((c) => favorites[`${g.leagueId}:${c.id}`])
+  ).length;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -148,6 +152,7 @@ export default function App() {
       }
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
       if (e.key.toLowerCase() === 'h') setView('home');
+      if (e.key.toLowerCase() === 's') setView('starred');
       const n = Number(e.key);
       if (n >= 1 && n <= visible.length) setView(visible[n - 1].id);
     };
@@ -172,6 +177,11 @@ export default function App() {
             <span className="nav-label">Home</span>
             {totalLive > 0 && <span className="badge live">{totalLive}</span>}
           </button>
+          <button className={`nav-item ${view === 'starred' ? 'active' : ''}`} onClick={() => go('starred')} title="Starred teams (S)">
+            <span className="nav-ic star-ic">★</span>
+            <span className="nav-label">Starred</span>
+            {starredLive > 0 && <span className="badge live">{starredLive}</span>}
+          </button>
           <div className="nav-sep">Leagues</div>
           {visible.map((l, i) => (
             <button
@@ -181,7 +191,9 @@ export default function App() {
               onClick={() => go(l.id)}
               title={`${l.full} (${i + 1})`}
             >
-              <span className="nav-ic lg">{l.name.slice(0, 2)}</span>
+              <span className="nav-ic lg">
+                <LeagueLogo lg={l} size={20} />
+              </span>
               <span className="nav-label">{l.name}</span>
               {liveCount(l.id) > 0 && <span className="badge live">{liveCount(l.id)}</span>}
             </button>
@@ -195,12 +207,15 @@ export default function App() {
 
         <main className="main">
           {view === 'home' && <Home hub={hub} onNavigate={go} />}
+          {view === 'starred' && <Starred hub={hub} />}
           {view === 'settings' && <Settings />}
           {lg && (
             <div className="league-view" style={{ '--lg': lg.accent }}>
               <div className="league-head">
                 <div>
-                  <h1>{lg.full}</h1>
+                  <h1>
+                    <LeagueLogo lg={lg} size={30} /> {lg.full}
+                  </h1>
                 </div>
                 <Tabs tabs={LEAGUE_TABS} value={leagueTab} onChange={setLeagueTab} />
               </div>

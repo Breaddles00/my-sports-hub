@@ -381,9 +381,38 @@ async function getSquiggleLadder() {
 }
 
 // ---------- teams ----------
+// ESPN's /teams endpoint ignores `groups`, so for college football it returns every
+// division (~760 teams) in no useful order; a capped `limit` silently drops real FBS
+// teams (e.g. Iowa). Instead we fetch the full list and keep only the team IDs that
+// appear in the FBS standings. If the standings call fails or looks wrong, we fall
+// back to the full list rather than hiding teams.
+async function getStandingsTeamIds(lg, params) {
+  const d = await getJSON(`${STANDINGS}/${lg.sport}/${lg.league}/standings`, params);
+  const ids = new Set();
+  const walk = (o) => {
+    if (!o || typeof o !== 'object') return;
+    (o.standings?.entries || []).forEach((e) => e.team?.id && ids.add(String(e.team.id)));
+    (o.children || []).forEach(walk);
+  };
+  walk(d);
+  return ids;
+}
+
 export async function getTeams(lg) {
-  const d = await getJSON(`${site(lg)}/teams`, lg.teamsParams || { limit: '100' });
-  const teams = (d.sports?.[0]?.leagues?.[0]?.teams || []).map((t) => t.team).filter(Boolean);
+  const [d, keepIds] = await Promise.all([
+    getJSON(`${site(lg)}/teams`, lg.teamsParams || { limit: '100' }),
+    lg.teamsFromStandings ? getStandingsTeamIds(lg, lg.teamsFromStandings).catch(() => null) : null,
+  ]);
+  let teams = (d.sports?.[0]?.leagues?.[0]?.teams || []).map((t) => t.team).filter(Boolean);
+  if (keepIds && keepIds.size >= 100) teams = teams.filter((t) => keepIds.has(String(t.id)));
+  const exclude = new Set(lg.excludeTeamIds || []);
+  const seen = new Set();
+  teams = teams.filter((t) => {
+    const id = String(t.id);
+    if (exclude.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
   return teams
     .map((t) => ({
       id: t.id,
@@ -395,6 +424,115 @@ export async function getTeams(lg) {
       color: t.color ? `#${t.color}` : null,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function mapTeamInfo(t, teamId) {
+  return {
+    id: teamId,
+    name: t.displayName,
+    short: t.shortDisplayName,
+    abbr: t.abbreviation,
+    logo: teamLogo(t),
+    color: t.color ? `#${t.color}` : null,
+    record: t.record?.items?.find((i) => i.type === 'total')?.summary || t.record?.items?.[0]?.summary || '',
+    standing: t.standingSummary || '',
+  };
+}
+
+// Team header + schedule (no roster) for the Starred view.
+export async function getTeamSummary(lg, teamId) {
+  const [info, schedule] = await Promise.allSettled([
+    getJSON(`${site(lg)}/teams/${teamId}`),
+    getJSON(`${site(lg)}/teams/${teamId}/schedule`),
+  ]);
+  if (info.status === 'rejected' && schedule.status === 'rejected') throw info.reason;
+  const team = mapTeamInfo(info.value?.team || {}, teamId);
+  const games = (schedule.value?.events || []).map((e) => normalizeEvent(e, lg)).sort((a, b) => new Date(a.date) - new Date(b.date));
+  return { leagueId: lg.id, team, games };
+}
+
+// News tagged with one team. ESPN's `team` filter works for every league we support;
+// we also keep only articles that actually tag the team, in case the filter is ignored.
+export async function getTeamNews(lg, teamId, limit = 20) {
+  const d = await getJSON(`${site(lg)}/news`, { team: teamId, limit: String(limit) });
+  return (d.articles || []).map(mapArticle).filter((a) => a.teamIds.includes(String(teamId)));
+}
+
+// Season team stats. Most leagues use the site API; ESPN only serves AFL team stats
+// from the core API. `seasontype=2` forces the regular season (otherwise MLB returns
+// its postseason split once the playoffs start).
+export async function getTeamStats(lg, teamId) {
+  let cats = [];
+  let season = '';
+  if (lg.teamStats === 'core') {
+    const year = new Date().getFullYear();
+    for (const y of [year, year - 1]) {
+      try {
+        const d = await getJSON(`https://sports.core.api.espn.com/v2/sports/${lg.sport}/leagues/${lg.league}/seasons/${y}/types/2/teams/${teamId}/statistics`);
+        cats = d.splits?.categories || [];
+        const gp = cats.flatMap((c) => c.stats || []).find((s) => s.name === 'gamesPlayed');
+        if (cats.length && (!gp || gp.value > 0)) {
+          season = `${y} regular season`;
+          break;
+        }
+        cats = [];
+      } catch {
+        /* try the previous season */
+      }
+    }
+  } else {
+    const d = await getJSON(`${site(lg)}/teams/${teamId}/statistics`, { seasontype: '2' });
+    cats = d.results?.stats?.categories || [];
+    if (d.season?.displayName) season = `${d.season.displayName} regular season`;
+  }
+  const categories = cats
+    .map((c) => {
+      const seen = new Set();
+      const stats = (c.stats || [])
+        .filter((s) => {
+          if (!s.name || seen.has(s.name) || HIDDEN_STATS.has(s.name) || s.displayValue == null) return false;
+          seen.add(s.name);
+          return true;
+        })
+        .map((s) => ({
+          name: s.name,
+          abbr: s.abbreviation || s.shortDisplayName || '',
+          label: s.displayName || s.shortDisplayName || s.name,
+          value: s.displayValue,
+          perGame: s.perGameDisplayValue,
+          rank: s.rankDisplayValue,
+        }));
+      return { name: c.name, label: c.displayName || c.name, stats };
+    })
+    .filter((c) => c.stats.length);
+  return { season, categories };
+}
+const HIDDEN_STATS = new Set(['isQualified', 'WARBR', 'offWARBR', 'defWARBR', 'zoneRating']);
+
+// Depth chart (NFL, MLB, NBA, NHL; ESPN doesn't publish them for college football or AFL).
+export async function getDepthChart(lg, teamId) {
+  const d = await getJSON(`${site(lg)}/teams/${teamId}/depthcharts`);
+  const unit = (name) => (/special/i.test(name) ? 2 : /\bD\b|defen|4-3|3-4|nickel|dime/i.test(name) ? 1 : 0);
+  // ESPN lists football offense WRs first; show it the usual way (QB, RB, WR, TE, O-line).
+  const order = lg.sport === 'football' ? ['QB', 'RB', 'FB', 'WR', 'TE', 'LT', 'LG', 'C', 'RG', 'RT'] : [];
+  const rank = (abbr) => (order.includes(abbr) ? order.indexOf(abbr) : order.length);
+  return (d.depthchart || [])
+    .map((c) => ({
+      id: String(c.id ?? c.name),
+      name: c.name === 'Depth Chart' || c.name === 'Default' ? 'Lineup' : c.name,
+      positions: Object.entries(c.positions || {}).map(([key, p]) => ({
+        key,
+        abbr: p.position?.abbreviation || key.toUpperCase(),
+        name: p.position?.displayName || p.position?.name || key.toUpperCase(),
+        athletes: (p.athletes || []).map((a) => {
+          const status = a.injuries?.[0]?.status || '';
+          return { id: a.id, name: a.displayName || a.shortName, short: a.shortName, status: /^active$/i.test(status) ? '' : status };
+        }),
+      })),
+    }))
+    .map((c) => ({ ...c, positions: [...c.positions].sort((a, b) => rank(a.abbr) - rank(b.abbr)) }))
+    .filter((c) => c.positions.length)
+    .sort((a, b) => unit(a.name) - unit(b.name));
 }
 
 export async function getTeamDetail(lg, teamId) {
@@ -455,4 +593,8 @@ const mapArticle = (a) => ({
   link: a.links?.web?.href || a.links?.mobile?.href,
   type: a.type,
   byline: a.byline,
+  teamIds: (a.categories || [])
+    .filter((c) => c.type === 'team')
+    .map((c) => String(c.teamId ?? c.team?.id ?? ''))
+    .filter(Boolean),
 });

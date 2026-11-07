@@ -60,7 +60,14 @@ export default function Home({ hub, onNavigate }) {
       )}
 
       <section>
-        <h2 className="section-title">★ My teams</h2>
+        <h2 className="section-title">
+          ★ My teams
+          {favList.length > 0 && (
+            <button className="link small" onClick={() => onNavigate('starred')}>
+              News, stats & depth charts →
+            </button>
+          )}
+        </h2>
         {favList.length === 0 ? (
           <Empty title="You're not following any teams yet" icon="☆">
             Click the ☆ next to any team on a scoreboard, standings table or Teams tab. Followed teams show here and trigger desktop alerts when they score.

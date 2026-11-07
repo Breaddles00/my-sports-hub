@@ -137,6 +137,7 @@ export default function Settings() {
           <span>Open on</span>
           <select value={settings.startView} onChange={(e) => set({ startView: e.target.value })}>
             <option value="home">Home</option>
+            <option value="starred">Starred teams</option>
             {LEAGUES.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.full}

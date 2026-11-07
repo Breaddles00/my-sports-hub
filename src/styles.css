@@ -1358,7 +1358,7 @@ tr.fav td {
   transform: translateY(-2px);
   border-color: var(--border-2);
 }
-.news-card img,
+.news-card > img,
 .news-ph {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -1498,4 +1498,211 @@ tr.fav td {
 }
 .update-banner span {
   flex: 1;
+}
+
+/* ---------- starred ---------- */
+.nav-ic.star-ic {
+  color: var(--gold);
+}
+.starred-head {
+  margin-bottom: 4px;
+}
+.star-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fav-chip.active {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, var(--panel));
+}
+.starred-body {
+  margin-top: 18px;
+}
+.star-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.star-cards.single {
+  grid-template-columns: minmax(0, 640px);
+}
+.star-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--tc);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--tc) 18%, transparent), transparent 60%), var(--panel);
+}
+.star-card.clickable {
+  cursor: pointer;
+}
+.star-card.clickable:hover {
+  border-color: var(--border-2);
+  border-left-color: var(--tc);
+}
+.star-card.big {
+  padding: 18px 20px;
+}
+.star-card.big .sc-title strong {
+  font-size: 20px;
+}
+.star-card > .btn {
+  align-self: flex-start;
+}
+.sc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sc-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sc-title strong {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-games {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mini-game {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--bg-2);
+  cursor: pointer;
+  text-align: left;
+}
+.mini-game:hover {
+  background: var(--hover);
+}
+.mini-game.state-in {
+  background: color-mix(in srgb, var(--accent-live) 12%, var(--bg-2));
+}
+.mg-label {
+  width: 34px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.mini-game.state-in .mg-label {
+  color: var(--accent-live);
+}
+.mg-opp {
+  font-weight: 600;
+}
+.star-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 0 14px;
+}
+.sched-me {
+  font-weight: 600;
+  min-width: 70px;
+}
+.news-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.news-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px 2px 4px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--gold) 14%, transparent);
+  color: var(--text-2);
+}
+.key-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin: 8px 0 16px;
+}
+.ks {
+  background: var(--panel);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ks strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 0 14px;
+  align-items: start;
+}
+td.strong {
+  font-weight: 700;
+}
+.compare td.left {
+  min-width: 150px;
+  padding-right: 24px;
+}
+.compare th.team-col,
+.compare td.strong {
+  min-width: 84px;
+}
+.compare th.team-col {
+  cursor: pointer;
+  text-transform: none;
+}
+.compare th.team-col:hover {
+  color: var(--text);
+}
+.compare th.team-col > * {
+  vertical-align: middle;
+}
+.compare th.team-col span {
+  margin-left: 6px;
+}
+.depth-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 15px !important;
+  color: var(--text) !important;
+}
+.depth-seg {
+  margin-bottom: 10px;
+}
+.depth .chip {
+  margin-left: 6px;
+}
+
+/* ---------- league logos ---------- */
+.league-logo {
+  object-fit: contain;
+  display: block;
 }

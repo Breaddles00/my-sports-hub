@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useApp } from '../store.jsx';
 
 export function Logo({ src, alt = '', size = 28, className = '' }) {
   const [bad, setBad] = useState(false);
@@ -27,6 +28,16 @@ export function Logo({ src, alt = '', size = 28, className = '' }) {
       onError={() => setBad(true)}
     />
   );
+}
+
+// League logo that follows the light/dark theme. Falls back to the league's short name
+// (e.g. "NF") if the image can't load, such as when offline.
+export function LeagueLogo({ lg, size = 18 }) {
+  const { settings } = useApp();
+  const src = settings.theme === 'dark' ? lg.logoDark || lg.logo : lg.logo;
+  const [bad, setBad] = useState(null);
+  if (!src || bad === src) return <>{lg.name.slice(0, 2)}</>;
+  return <img className="league-logo" src={src} alt="" width={size} height={size} draggable={false} onError={() => setBad(src)} />;
 }
 
 export const Spinner = ({ label = 'Loading…' }) => (

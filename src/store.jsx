@@ -82,8 +82,9 @@ export const refreshAll = () => window.dispatchEvent(new Event(REFRESH_EVENT));
 /**
  * Fetches data and keeps it fresh. Polls faster while `isLive(data)` is true.
  * Resets when `key` changes; manual refresh keeps showing the old data while loading.
+ * `minIdle` (seconds) slows idle polling for data that rarely changes (news, stats, depth charts).
  */
-export function usePoll(fetcher, key, { isLive, enabled = true } = {}) {
+export function usePoll(fetcher, key, { isLive, enabled = true, minIdle = 0 } = {}) {
   const { settings } = useApp();
   const [state, setState] = useState({ data: null, error: null, loading: true, updated: null, key });
   const [nonce, setNonce] = useState(0);
@@ -110,11 +111,11 @@ export function usePoll(fetcher, key, { isLive, enabled = true } = {}) {
         if (cancelled) return;
         setState({ data, error: null, loading: false, updated: new Date(), key });
         const live = liveRef.current ? liveRef.current(data) : false;
-        timer = setTimeout(run, (live ? settings.liveRefresh : settings.idleRefresh) * 1000);
+        timer = setTimeout(run, (live ? settings.liveRefresh : Math.max(settings.idleRefresh, minIdle)) * 1000);
       } catch (e) {
         if (cancelled) return;
         setState((s) => ({ ...s, error: e.message || String(e), loading: false, key }));
-        timer = setTimeout(run, Math.max(30, settings.idleRefresh) * 1000);
+        timer = setTimeout(run, Math.max(30, settings.idleRefresh, minIdle) * 1000);
       }
     };
     run();
@@ -122,7 +123,7 @@ export function usePoll(fetcher, key, { isLive, enabled = true } = {}) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [key, nonce, enabled, settings.liveRefresh, settings.idleRefresh]);
+  }, [key, nonce, enabled, settings.liveRefresh, settings.idleRefresh, minIdle]);
 
   return { ...state, refresh: () => setNonce((n) => n + 1) };
 }
