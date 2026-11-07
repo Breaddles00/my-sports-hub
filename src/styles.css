@@ -1700,6 +1700,40 @@ td.strong {
 .depth .chip {
   margin-left: 6px;
 }
+/* Depth chart injury tags: Out red, IR bold red, Questionable orange, Active green. */
+.chip.inj-out {
+  --inj: #ef4444;
+  color: var(--inj);
+  background: color-mix(in srgb, var(--inj) 18%, transparent);
+}
+.chip.inj-ir {
+  --inj: #dc2626;
+  color: #fff;
+  background: var(--inj);
+  font-weight: 800;
+}
+.chip.inj-q {
+  --inj: #fb923c;
+  color: var(--inj);
+  background: color-mix(in srgb, var(--inj) 16%, transparent);
+}
+.chip.inj-active {
+  --inj: #22c55e;
+  color: var(--inj);
+  background: color-mix(in srgb, var(--inj) 14%, transparent);
+}
+[data-theme='light'] .chip.inj-out {
+  --inj: #dc2626;
+}
+[data-theme='light'] .chip.inj-ir {
+  --inj: #b91c1c;
+}
+[data-theme='light'] .chip.inj-q {
+  --inj: #ea580c;
+}
+[data-theme='light'] .chip.inj-active {
+  --inj: #16a34a;
+}
 
 /* ---------- league logos ---------- */
 .league-logo {

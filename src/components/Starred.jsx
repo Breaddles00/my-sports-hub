@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE_BY_ID } from '../leagues.js';
 import { fmtDate, fmtTime, getDepthChart, getTeamNews, getTeamStats, getTeamSummary } from '../api.js';
+import { applyInjuryHistory } from '../injuries.js';
 import { useApp, usePoll } from '../store.jsx';
 import { NewsGrid } from './News.jsx';
 import { Empty, ErrorBox, Logo, Spinner, Star, Tabs } from './common.jsx';
@@ -458,9 +459,11 @@ function TeamStats({ lg, s }) {
 function DepthTab({ teams, single }) {
   const eligible = teams.filter((f) => LEAGUE_BY_ID[f.leagueId].depthChart);
   const skipped = teams.filter((f) => !LEAGUE_BY_ID[f.leagueId].depthChart);
-  const { data, error, loading, refresh } = usePoll(() => perTeam(eligible, getDepthChart), `starred-depth:${eligible.map(favKey)}`, {
-    minIdle: 1800,
-  });
+  const { data, error, loading, refresh } = usePoll(
+    () => perTeam(eligible, async (lg, id) => applyInjuryHistory(lg.id, await getDepthChart(lg, id))),
+    `starred-depth:${eligible.map(favKey)}`,
+    { minIdle: 1800 }
+  );
   if (loading && !data) return <Spinner label="Loading depth charts…" />;
   if (error && !data) return <ErrorBox error={error} onRetry={refresh} />;
 
@@ -540,7 +543,7 @@ function DepthChart({ charts }) {
                       {a ? (
                         <>
                           {a.name}
-                          {a.status && <span className="chip warn">{a.status}</span>}
+                          {a.tag && <span className={`chip ${a.tag.kind === 'other' ? 'warn' : `inj-${a.tag.kind}`}`}>{a.tag.label}</span>}
                         </>
                       ) : (
                         ''

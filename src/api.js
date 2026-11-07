@@ -524,10 +524,13 @@ export async function getDepthChart(lg, teamId) {
         key,
         abbr: p.position?.abbreviation || key.toUpperCase(),
         name: p.position?.displayName || p.position?.name || key.toUpperCase(),
-        athletes: (p.athletes || []).map((a) => {
-          const status = a.injuries?.[0]?.status || '';
-          return { id: a.id, name: a.displayName || a.shortName, short: a.shortName, status: /^active$/i.test(status) ? '' : status };
-        }),
+        // Raw status, "Active" included; src/injuries.js decides what to show.
+        athletes: (p.athletes || []).map((a) => ({
+          id: a.id,
+          name: a.displayName || a.shortName,
+          short: a.shortName,
+          status: a.injuries?.[0]?.status || '',
+        })),
       })),
     }))
     .map((c) => ({ ...c, positions: [...c.positions].sort((a, b) => rank(a.abbr) - rank(b.abbr)) }))
