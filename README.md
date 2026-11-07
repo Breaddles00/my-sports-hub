@@ -36,9 +36,9 @@ To start a new minor or major version, change `"version"` in `package.json` (e.g
 ## Features
 
 - **Home dashboard**: every live game across all six leagues, your followed teams, and today's slate for each league.
-- **Starred**: just your starred teams, with a merged schedule and results list, a news feed, season stats (key-stat comparison per league, or full stats for one team) and depth charts (NFL, MLB, NBA and NHL; ESPN doesn't publish them for NCAAF or AFL). Hover an injury tag (Out, Questionable, IR, Active…) for ESPN's latest note on the injury and when it was updated. Pick a team chip to focus on one team.
+- **Starred**: just your starred teams, with a merged schedule and results list (bye weeks included), a news feed, season stats (key-stat comparison per league, or full stats for one team) a roster for each team (NFL and NCAAF split into Offense, Defense and Special Teams; other sports grouped by position) and depth charts (NFL, MLB, NBA and NHL; ESPN doesn't publish them for NCAAF or AFL). Hover an injury tag (Out, Questionable, IR, Active…) for ESPN's latest note on the injury and when it was updated. Pick a team chip to focus on one team.
 - **Live updates**: refreshes every 15s while games are in progress and every 60s otherwise (both adjustable). Scores flash when they change.
-- **Scoreboards**: browse by week (NFL/NCAAF) or game day (MLB/NBA/NHL/AFL), with Live/Upcoming/Final filters and team search. Cards show down & distance, possession, red zone, MLB count and bases, last play, TV, venue and betting line.
+- **Scoreboards**: browse by week (NFL/NCAAF) or game day (MLB/NBA/NHL/AFL), with Live/Upcoming/Final filters and team search. Each slate lists the teams on bye that week (NFL, NCAAF) or round (AFL, from Squiggle's fixture), or without a game that day (MLB, NBA, NHL). Cards show down & distance, possession, red zone, MLB count and bases, last play, TV, venue and betting line.
 - **Game centre**: line score, win-probability chart, leaders, scoring summary, full box score, team stats, play-by-play or drives, and game info.
 - **Standings**, **Teams** (schedule, results and roster with injuries; hover a status for the latest note) and **News**.
 - **Follow teams (☆)**: Windows notifications at kick-off, on every score, and at full time.

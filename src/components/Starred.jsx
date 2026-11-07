@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE_BY_ID } from '../leagues.js';
-import { fmtDate, fmtTime, getDepthChart, getTeamNews, getTeamStats, getTeamSummary } from '../api.js';
-import { applyInjuryHistory } from '../injuries.js';
+import {
+  fmtDate,
+  fmtTime,
+  footballByes,
+  getAflTeamByes,
+  getDepthChart,
+  getTeamNews,
+  getTeamRoster,
+  getTeamStats,
+  getTeamSummary,
+} from '../api.js';
+import { applyInjuryHistory, injuryKind } from '../injuries.js';
 import { InjuryTag } from './InjuryTag.jsx';
 import { useApp, usePoll } from '../store.jsx';
 import { NewsGrid } from './News.jsx';
 import { Empty, ErrorBox, Logo, Spinner, Star, Tabs } from './common.jsx';
 
-// The Starred view: schedule, news, stats and depth charts for followed teams only.
+// The Starred view: schedule, news, stats, rosters and depth charts for followed teams only.
 // "All teams" merges or compares every starred team; picking a chip focuses on one.
 
 const favKey = (f) => `${f.leagueId}:${f.id}`;
@@ -83,7 +93,7 @@ export default function Starred({ hub }) {
           <h1>Starred teams</h1>
         </div>
         <Empty title="You haven't starred any teams yet" icon="☆">
-          Click the ☆ next to a team on any scoreboard, standings table or Teams tab. Their schedule, news, stats and depth charts will
+          Click the ☆ next to a team on any scoreboard, standings table or Teams tab. Their schedule, news, stats, roster and depth charts will
           all show up here.
         </Empty>
       </div>
@@ -94,6 +104,7 @@ export default function Starred({ hub }) {
     { id: 'schedule', label: 'Schedule' },
     { id: 'news', label: 'News' },
     { id: 'stats', label: 'Stats' },
+    { id: 'roster', label: 'Roster' },
     ...(hasDepth ? [{ id: 'depth', label: 'Depth charts' }] : []),
   ];
   const scope = selected.map(favKey).join(',');
@@ -119,14 +130,28 @@ export default function Starred({ hub }) {
       {tab === 'schedule' && <ScheduleTab key={scope} teams={selected} single={single} hub={hub} onPick={setSel} />}
       {tab === 'news' && <NewsTab key={scope} teams={selected} />}
       {tab === 'stats' && <StatsTab key={scope} teams={selected} single={single} onPick={setSel} />}
+      {tab === 'roster' && <RosterTab key={scope} teams={selected} single={single} />}
       {tab === 'depth' && <DepthTab key={scope} teams={selected} single={single} />}
     </div>
   );
 }
 
 // ---------- schedule ----------
+// Team schedule plus its bye weeks: football from gaps in the week numbers, AFL from
+// Squiggle's fixture (ESPN's AFL schedule has no rounds). Byes never fail the schedule.
+async function teamSchedule(lg, id) {
+  const s = await getTeamSummary(lg, id);
+  let byes = [];
+  if (lg.mode === 'week') byes = footballByes(s.games);
+  else if (lg.id === 'afl' && s.games.length) {
+    const year = new Date(s.games[s.games.length - 1].date).getFullYear();
+    byes = await getAflTeamByes(s.team, year).catch(() => []);
+  }
+  return { ...s, byes };
+}
+
 function ScheduleTab({ teams, single, hub, onPick }) {
-  const { data, error, loading, refresh } = usePoll(() => perTeam(teams, getTeamSummary), `starred-sched:${teams.map(favKey)}`, {
+  const { data, error, loading, refresh } = usePoll(() => perTeam(teams, teamSchedule), `starred-sched:${teams.map(favKey)}`, {
     isLive: (d) => Object.values(d).some((s) => s.games?.some((g) => g.state === 'in')),
   });
   // The Home poller refreshes live games faster than team schedules, so prefer its copy.
@@ -158,6 +183,9 @@ function ScheduleTab({ teams, single, hub, onPick }) {
       rows.push({ g, f, lg, m });
     })
   );
+  entries.forEach(({ f, lg, s }) =>
+    (s.byes || []).forEach((b) => rows.push({ bye: b, g: { ...b, leagueId: lg.id, id: `${favKey(f)}:${b.id}` }, f, lg, team: s.team }))
+  );
   const upcoming = rows.filter((r) => r.g.state !== 'post').sort((a, b) => new Date(a.g.date) - new Date(b.g.date));
   const results = rows.filter((r) => r.g.state === 'post').sort((a, b) => new Date(b.g.date) - new Date(a.g.date));
   const cap = single ? Infinity : 20;
@@ -174,9 +202,13 @@ function ScheduleTab({ teams, single, hub, onPick }) {
           <h4>Coming up</h4>
           {upcoming.length ? (
             <ul className="schedule">
-              {upcoming.slice(0, cap).map((r) => (
-                <GameRow key={`${r.g.leagueId}:${r.g.id}`} {...r} showTeam={!single} />
-              ))}
+              {upcoming.slice(0, cap).map((r) =>
+                r.bye ? (
+                  <ByeRow key={r.g.id} {...r} showTeam={!single} />
+                ) : (
+                  <GameRow key={`${r.g.leagueId}:${r.g.id}`} {...r} showTeam={!single} />
+                )
+              )}
             </ul>
           ) : (
             <p className="muted">No upcoming games on the schedule.</p>
@@ -186,9 +218,13 @@ function ScheduleTab({ teams, single, hub, onPick }) {
           <h4>Results</h4>
           {results.length ? (
             <ul className="schedule">
-              {results.slice(0, cap).map((r) => (
-                <GameRow key={`${r.g.leagueId}:${r.g.id}`} {...r} showTeam={!single} />
-              ))}
+              {results.slice(0, cap).map((r) =>
+                r.bye ? (
+                  <ByeRow key={r.g.id} {...r} showTeam={!single} />
+                ) : (
+                  <GameRow key={`${r.g.leagueId}:${r.g.id}`} {...r} showTeam={!single} />
+                )
+              )}
             </ul>
           ) : (
             <p className="muted">No completed games yet this season.</p>
@@ -205,6 +241,8 @@ function TeamCard({ f, lg, s, games, single, onPick }) {
   const live = games.find((g) => g.state === 'in');
   const next = games.find((g) => g.state === 'pre');
   const last = [...games].reverse().find((g) => g.state === 'post');
+  // A bye this week or before the next game.
+  const bye = !live && (s.byes || []).find((b) => b.state === 'pre' && (!next || new Date(b.date) < new Date(next.date)));
   return (
     <div
       className={`star-card ${single ? 'big' : 'clickable'}`}
@@ -232,8 +270,14 @@ function TeamCard({ f, lg, s, games, single, onPick }) {
         <div className="sc-games">
           {live && <MiniGame label="Live" g={live} f={f} lg={lg} />}
           {!live && last && <MiniGame label="Last" g={last} f={f} lg={lg} />}
+          {bye && (
+            <div className="mini-game bye">
+              <span className="mg-label">Bye</span>
+              <span className="muted small">{bye.label}</span>
+            </div>
+          )}
           {next && <MiniGame label="Next" g={next} f={f} lg={lg} />}
-          {!live && !last && !next && <span className="muted small">No games on the schedule</span>}
+          {!live && !last && !next && !bye && <span className="muted small">No games on the schedule</span>}
         </div>
       )}
       {single && (
@@ -289,6 +333,29 @@ function GameRow({ g, f, lg, m, showTeam }) {
       )}
       <span className="spacer" />
       <Result g={g} m={m} />
+    </li>
+  );
+}
+
+function ByeRow({ bye, f, lg, team, showTeam }) {
+  return (
+    <li className="sched-row bye-row">
+      <span className="sched-date">{bye.label}</span>
+      {showTeam && (
+        <>
+          <Logo src={team?.logo || f.logo} alt={f.name} size={20} />
+          <span className="sched-me">{team?.short || f.short || f.name}</span>
+        </>
+      )}
+      <span className="sched-vs" />
+      <span className="bye-pill">Bye</span>
+      {showTeam && (
+        <span className="league-tag" style={{ '--lg': lg.accent }}>
+          {lg.name}
+        </span>
+      )}
+      <span className="spacer" />
+      <span className="muted small">No game</span>
     </li>
   );
 }
@@ -453,6 +520,122 @@ function TeamStats({ lg, s }) {
         })}
       </div>
     </div>
+  );
+}
+
+// ---------- roster ----------
+// Football: Offense / Defense / Special Teams, one at a time. Other sports: ESPN's
+// position groups stacked in one table. See getTeamRoster() in api.js.
+function RosterTab({ teams, single }) {
+  const { data, error, loading, refresh } = usePoll(() => perTeam(teams, getTeamRoster), `starred-roster:${teams.map(favKey)}`, {
+    minIdle: 1800,
+  });
+  if (loading && !data) return <Spinner label="Loading rosters…" />;
+  if (error && !data) return <ErrorBox error={error} onRetry={refresh} />;
+
+  return (
+    <div className="starred-body">
+      {teams.map((f) => {
+        const r = data?.[favKey(f)];
+        const lg = LEAGUE_BY_ID[f.leagueId];
+        return (
+          <section className="panel" key={favKey(f)}>
+            {!single && (
+              <h4 className="depth-title">
+                <Logo src={f.logo} alt={f.name} size={22} /> {f.name}
+                <span className="league-tag" style={{ '--lg': lg.accent }}>
+                  {lg.name}
+                </span>
+              </h4>
+            )}
+            {r?.error ? (
+              <p className="muted">Couldn't load this roster.</p>
+            ) : r?.sections?.length ? (
+              <Roster r={r} />
+            ) : (
+              <p className="muted">ESPN hasn't published a roster for this team.</p>
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+const ROSTER_COLS = [
+  { key: 'age', label: 'Age' },
+  { key: 'height', label: 'Ht' },
+  { key: 'weight', label: 'Wt' },
+  { key: 'experience', label: 'Exp', fmt: (v) => (v === 0 ? 'R' : v) },
+  { key: 'college', label: 'College', left: true },
+];
+const hasVal = (v) => v !== undefined && v !== null && v !== '';
+
+function Roster({ r }) {
+  const [id, setId] = useState(r.sections[0].id);
+  const cur = r.sections.find((x) => x.id === id) || r.sections[0];
+  const shown = r.split ? [cur] : r.sections;
+  const all = r.sections.flatMap((x) => x.players);
+  const cols = ROSTER_COLS.filter((c) => all.some((p) => hasVal(p[c.key])));
+  const width = 3 + cols.length;
+  return (
+    <>
+      {r.split && r.sections.length > 1 && (
+        <div className="seg depth-seg">
+          {r.sections.map((x) => (
+            <button key={x.id} className={x.id === cur.id ? 'active' : ''} onClick={() => setId(x.id)}>
+              {x.name}
+              <span className="seg-n">{x.players.length}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="table-wrap">
+        <table className="box roster">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th className="left">Name</th>
+              <th>Pos</th>
+              {cols.map((c) => (
+                <th key={c.key} className={c.left ? 'left' : ''}>
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {shown.map((x) => (
+            <tbody key={x.id}>
+              {shown.length > 1 && (
+                <tr className="roster-group">
+                  <th colSpan={width} className="left">
+                    {x.name} <span className="muted small">{x.players.length}</span>
+                  </th>
+                </tr>
+              )}
+              {x.players.map((p) => {
+                const kind = injuryKind(p.status);
+                return (
+                  <tr key={p.id || p.name}>
+                    <td className="muted">{p.jersey}</td>
+                    <td className="left player">
+                      {p.name}
+                      {p.status && kind !== 'active' && <InjuryTag tag={{ label: p.status, kind, injury: p.injury }} />}
+                    </td>
+                    <td title={p.posName}>{p.pos}</td>
+                    {cols.map((c) => (
+                      <td key={c.key} className={c.left ? 'left muted' : ''}>
+                        {hasVal(p[c.key]) ? (c.fmt ? c.fmt(p[c.key]) : p[c.key]) : ''}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          ))}
+        </table>
+      </div>
+    </>
   );
 }
 

@@ -1818,3 +1818,86 @@ td.strong {
   object-fit: contain;
   display: block;
 }
+
+/* ---------- bye weeks ---------- */
+.bye-strip .day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bye-n {
+  font-size: 11px;
+  letter-spacing: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text-2);
+}
+.bye-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bye-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bye-team:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border-2);
+}
+.bye-team:disabled {
+  cursor: default;
+}
+.bye-idle .bye-team {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.bye-pill {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px dashed var(--border-2);
+  padding: 1px 8px;
+  border-radius: 5px;
+}
+.sched-row.bye-row {
+  cursor: default;
+}
+.sched-row.bye-row:hover {
+  background: none;
+}
+.mini-game.bye {
+  cursor: default;
+  border: 1px dashed var(--border-2);
+  background: none;
+}
+.mini-game.bye:hover {
+  background: none;
+}
+
+/* ---------- Starred roster ---------- */
+.roster .chip {
+  margin-left: 6px;
+}
+.roster tr.roster-group th {
+  padding-top: 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border-2);
+}
+.roster tbody:first-of-type tr.roster-group th {
+  padding-top: 6px;
+}

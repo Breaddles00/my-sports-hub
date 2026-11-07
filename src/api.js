@@ -82,6 +82,9 @@ export function normalizeEvent(ev, lg) {
     name: ev.name,
     shortName: ev.shortName,
     date: ev.date || comp.date,
+    // Football week + season type (2 = regular season), used to find bye weeks.
+    week: ev.week?.number ?? null,
+    seasonType: num(ev.seasonType?.type ?? ev.season?.type) || null,
     state: type.state || 'pre', // pre | in | post
     completed: !!type.completed,
     detail: type.shortDetail || type.detail || type.description || '',
@@ -124,11 +127,15 @@ export async function getScoreboard(lg, { date, week, seasontype } = {}) {
   const league = data.leagues?.[0] || {};
   const events = (data.events || []).map((e) => normalizeEvent(e, lg));
   events.sort((a, b) => stateOrder(a) - stateOrder(b) || new Date(a.date) - new Date(b.date));
+  const seasonType = data.season?.type ?? null;
+  // Bye teams are a nice-to-have: never let them break the scoreboard.
+  const byes = await getByes(lg, { data, events, seasonType }).catch(() => []);
   return {
     events,
+    byes,
     day: data.day?.date || null,
     week: data.week?.number ?? null,
-    seasonType: data.season?.type ?? null,
+    seasonType,
     seasonYear: data.season?.year ?? league.season?.year ?? null,
     calendar: league.calendar || [],
     calendarType: league.calendarType || null,
@@ -166,6 +173,150 @@ export function calendarDays(calendar) {
     .map((d) => d.slice(0, 10).replace(/-/g, ''))
     .filter((v, i, a) => a.indexOf(v) === i)
     .sort();
+}
+
+// ---------- bye weeks ----------
+// Who isn't playing in the slate on screen. Returns { kind, round, teams } or null.
+//  NFL:   ESPN lists `week.teamsOnBye` on the scoreboard; worked out if it's missing.
+//  NCAAF: ESPN gives no list, so it's FBS teams minus this week's games. Skipped when
+//         most teams are idle (week 0, championship week): that's not a bye week.
+//  AFL:   byes are per round but ESPN's AFL scoreboard is by day, so the round comes
+//         from Squiggle's fixture.
+//  MLB, NBA, NHL: no byes; teams without a game that day (kind 'idle').
+const MAX_BYE_SHARE = 0.35;
+const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+const mapByeTeam = (t) => ({
+  id: t.id != null ? String(t.id) : null,
+  name: t.displayName || t.name || '',
+  short: t.shortDisplayName || t.short || t.name || '',
+  abbr: t.abbreviation || t.abbr || '',
+  logo: teamLogo(t),
+});
+
+async function getByes(lg, { data, events, seasonType }) {
+  if (!events.length) return null;
+  if (lg.id === 'afl') return getAflRoundByes(lg, events);
+  if (lg.mode === 'week') {
+    if (seasonType != null && Number(seasonType) !== 2) return null; // regular season only
+    const listed = data.week?.teamsOnBye;
+    if (Array.isArray(listed)) return { kind: 'bye', round: null, teams: listed.map(mapByeTeam).sort(byName) };
+  }
+  const teams = await getTeamsCached(lg);
+  const playing = new Set(events.flatMap((e) => e.competitors.map((c) => String(c.id))));
+  if (!teams.some((t) => playing.has(String(t.id)))) return null; // all-star games and the like
+  const idle = teams.filter((t) => !playing.has(String(t.id))).map(mapByeTeam);
+  if (lg.mode === 'week') {
+    if (idle.length > teams.length * MAX_BYE_SHARE) return null;
+    return { kind: 'bye', round: null, teams: idle };
+  }
+  return { kind: 'idle', round: null, teams: idle };
+}
+
+// Bye weeks in one team's football schedule: regular-season week numbers missing
+// between its first and last game. Each bye sits between the games either side of it.
+export function footballByes(games) {
+  const reg = games
+    .filter((g) => g.week != null && (g.seasonType == null || g.seasonType === 2))
+    .sort((a, b) => a.week - b.week || new Date(a.date) - new Date(b.date));
+  if (reg.length < 2) return [];
+  const have = new Set(reg.map((g) => g.week));
+  const out = [];
+  for (let w = reg[0].week + 1; w < reg[reg.length - 1].week; w++) {
+    if (have.has(w)) continue;
+    const prev = reg.filter((g) => g.week < w).pop();
+    const next = reg.find((g) => g.week > w);
+    const mid = (new Date(prev.date).getTime() + new Date(next.date).getTime()) / 2;
+    out.push({ bye: true, id: `bye-${w}`, week: w, label: `Week ${w}`, date: new Date(mid).toISOString(), state: next.state === 'post' ? 'post' : 'pre' });
+  }
+  return out;
+}
+
+// Squiggle's AFL fixture for a year, grouped by round. Cached for an hour.
+const squiggleCache = new Map();
+const squiggleTime = (g) => (g.unixtime ? Number(g.unixtime) * 1000 : Date.parse(`${String(g.date || '').replace(' ', 'T')}${g.tz || ''}`));
+export function getAflSeason(year) {
+  const hit = squiggleCache.get(year);
+  if (hit && Date.now() - hit.t < 3600 * 1000) return hit.p;
+  const p = getJSON('https://api.squiggle.com.au/', { q: 'games', year: String(year) })
+    .then((d) => {
+      const rounds = new Map();
+      const teams = new Set();
+      for (const g of d.games || []) {
+        if (!g.hteam || !g.ateam) continue;
+        const t = squiggleTime(g);
+        if (Number.isNaN(t)) continue;
+        teams.add(g.hteam);
+        teams.add(g.ateam);
+        let r = rounds.get(g.round);
+        if (!r) {
+          r = { round: g.round, name: g.roundname || `Round ${g.round}`, final: false, first: t, last: t, days: new Set(), teams: new Set() };
+          rounds.set(g.round, r);
+        }
+        if (Number(g.is_final) > 0) r.final = true;
+        r.first = Math.min(r.first, t);
+        r.last = Math.max(r.last, t);
+        r.days.add(ymd(new Date(t)));
+        r.teams.add(g.hteam);
+        r.teams.add(g.ateam);
+      }
+      return { year, teams: [...teams].sort(), rounds: [...rounds.values()].sort((a, b) => a.round - b.round) };
+    })
+    .catch((e) => {
+      squiggleCache.delete(year);
+      throw e;
+    });
+  squiggleCache.set(year, { t: Date.now(), p });
+  return p;
+}
+
+// Squiggle names clubs by place ("Sydney", "Greater Western Sydney"); ESPN adds the
+// nickname ("Sydney Swans", "GWS Giants"). Exact matches first, then prefixes.
+const AFL_ALIASES = { greaterwesternsydney: ['gws', 'gwsgiants'], westernbulldogs: ['footscray', 'bulldogs'] };
+const espnNames = (t) => [t.location, t.name, t.short, t.abbr].filter(Boolean).map(nameKey);
+function aflMatch(t, sqName, exact) {
+  const k = nameKey(sqName);
+  const keys = [k, ...(AFL_ALIASES[k] || [])];
+  return espnNames(t).some((n) => keys.some((x) => (exact ? n === x : n.startsWith(x))));
+}
+export function findAflTeam(espnTeams, sqName) {
+  return espnTeams.find((t) => aflMatch(t, sqName, true)) || espnTeams.find((t) => aflMatch(t, sqName, false)) || null;
+}
+export function squiggleNameFor(sqNames, team) {
+  return sqNames.find((n) => aflMatch(team, n, true)) || sqNames.find((n) => aflMatch(team, n, false)) || null;
+}
+
+async function getAflRoundByes(lg, events) {
+  const days = new Set(events.map((e) => ymd(new Date(e.date))));
+  const year = new Date(events[0].date).getFullYear();
+  const season = await getAflSeason(year);
+  const round = season.rounds.find((r) => [...r.days].some((d) => days.has(d)));
+  if (!round || round.final) return null;
+  const espn = await getTeamsCached(lg).catch(() => []);
+  const teams = season.teams
+    .filter((n) => !round.teams.has(n))
+    .map((n) => {
+      const t = findAflTeam(espn, n);
+      return t ? mapByeTeam(t) : { id: null, name: n, short: n, abbr: '', logo: null };
+    });
+  return { kind: 'bye', round: round.name, teams };
+}
+
+// AFL byes for one team (Starred schedule), from Squiggle's fixture for `year`.
+export async function getAflTeamByes(team, year) {
+  const season = await getAflSeason(year);
+  const me = squiggleNameFor(season.teams, team);
+  if (!me) return [];
+  const now = Date.now();
+  return season.rounds
+    .filter((r) => !r.final && !r.teams.has(me))
+    .map((r) => ({
+      bye: true,
+      id: `bye-r${r.round}`,
+      week: r.round,
+      label: r.name,
+      date: new Date(r.first).toISOString(),
+      state: r.last + 4 * 3600 * 1000 < now ? 'post' : 'pre',
+    }));
 }
 
 // ---------- game summary ----------
@@ -426,12 +577,26 @@ export async function getTeams(lg) {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Team lists barely change, so the bye-week lookups share one copy per league (6 h).
+const teamsCache = new Map();
+export function getTeamsCached(lg) {
+  const hit = teamsCache.get(lg.id);
+  if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.p;
+  const p = getTeams(lg).catch((e) => {
+    teamsCache.delete(lg.id);
+    throw e;
+  });
+  teamsCache.set(lg.id, { t: Date.now(), p });
+  return p;
+}
+
 function mapTeamInfo(t, teamId) {
   return {
     id: teamId,
     name: t.displayName,
     short: t.shortDisplayName,
     abbr: t.abbreviation,
+    location: t.location,
     logo: teamLogo(t),
     color: t.color ? `#${t.color}` : null,
     record: t.record?.items?.find((i) => i.type === 'total')?.summary || t.record?.items?.[0]?.summary || '',
@@ -654,6 +819,7 @@ const mapRosterAthlete = (a, report) => ({
   name: a.displayName || a.fullName,
   jersey: a.jersey,
   pos: a.position?.abbreviation || a.position?.name || '',
+  posName: a.position?.displayName || a.position?.name || '',
   age: a.age,
   height: a.displayHeight,
   weight: a.displayWeight,
@@ -663,6 +829,85 @@ const mapRosterAthlete = (a, report) => ({
   status: a.injuries?.[0]?.status || '',
   injury: a.injuries?.length ? injuryFor(report, a) : null,
 });
+
+// ---------- roster (Starred) ----------
+// Football rosters are split into Offense, Defense and Special Teams: ESPN's own roster
+// groups ("offense", "defense", "specialTeam") decide, and the position decides for any
+// group that doesn't say. Players are ordered by position, then jersey number.
+const FOOTBALL_UNITS = [
+  { id: 'offense', name: 'Offense', group: /offen/i, pos: ['QB', 'RB', 'HB', 'TB', 'FB', 'WR', 'TE', 'OL', 'OT', 'T', 'LT', 'RT', 'OG', 'G', 'LG', 'RG', 'C'] },
+  { id: 'defense', name: 'Defense', group: /defen/i, pos: ['DL', 'DE', 'EDGE', 'DT', 'NT', 'LB', 'OLB', 'ILB', 'MLB', 'DB', 'CB', 'NB', 'S', 'SAF', 'FS', 'SS'] },
+  { id: 'special', name: 'Special Teams', group: /special/i, pos: ['PK', 'K', 'P', 'LS', 'H', 'KR', 'PR'] },
+];
+const jerseyNum = (p) => (p.jersey !== undefined && p.jersey !== '' && !Number.isNaN(Number(p.jersey)) ? Number(p.jersey) : 999);
+
+function footballRoster(groups) {
+  const units = FOOTBALL_UNITS.map((u) => ({ ...u, players: [] }));
+  const other = { id: 'other', name: 'Other', pos: [], players: [] };
+  for (const g of groups) {
+    const byGroup = units.find((u) => u.group.test(g.name));
+    for (const p of g.players) {
+      const pos = String(p.pos || '').toUpperCase();
+      (byGroup || units.find((u) => u.pos.includes(pos)) || other).players.push(p);
+    }
+  }
+  const rank = (u, p) => {
+    const i = u.pos.indexOf(String(p.pos || '').toUpperCase());
+    return i < 0 ? u.pos.length : i;
+  };
+  return [...units, other]
+    .filter((u) => u.players.length)
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      players: [...u.players].sort((a, b) => rank(u, a) - rank(u, b) || jerseyNum(a) - jerseyNum(b) || byName(a, b)),
+    }));
+}
+
+// Flat rosters (NBA, AFL): group by position, e.g. Guards / Forwards / Centers.
+const POS_GROUP_ORDER = ['Guards', 'Forwards', 'Centers', 'Midfielders', 'Rucks', 'Defenders'];
+function groupByPosition(players) {
+  const bucket = (p) => {
+    const n = String(p.posName || p.pos || '').toLowerCase();
+    if (/guard/.test(n)) return 'Guards';
+    if (/forward/.test(n)) return 'Forwards';
+    if (/center|centre/.test(n)) return 'Centers';
+    if (/mid/.test(n)) return 'Midfielders';
+    if (/ruck/.test(n)) return 'Rucks';
+    if (/defen|back/.test(n)) return 'Defenders';
+    return 'Players';
+  };
+  const m = new Map();
+  players.forEach((p) => {
+    const b = bucket(p);
+    if (!m.has(b)) m.set(b, []);
+    m.get(b).push(p);
+  });
+  const ord = (n) => (POS_GROUP_ORDER.includes(n) ? POS_GROUP_ORDER.indexOf(n) : POS_GROUP_ORDER.length);
+  const out = [...m.entries()].sort((a, b) => ord(a[0]) - ord(b[0]));
+  if (out.length === 1) out[0][0] = 'Roster';
+  return out.map(([name, list]) => ({ id: name, name, players: [...list].sort((a, b) => jerseyNum(a) - jerseyNum(b) || byName(a, b)) }));
+}
+
+// { split, sections: [{ id, name, players }] }. `split` (football) means the sections
+// are shown one at a time; otherwise they're stacked in one table.
+export async function getTeamRoster(lg, teamId) {
+  const [d, report] = await Promise.all([getJSON(`${site(lg)}/teams/${teamId}/roster`), getLeagueInjuries(lg)]);
+  const ath = d.athletes || [];
+  const grouped = ath.length > 0 && Array.isArray(ath[0]?.items);
+  const groups = (grouped ? ath.map((g) => ({ name: g.position || g.name || '', players: g.items || [] })) : [{ name: '', players: ath }]).map(
+    (g) => ({ name: g.name, players: g.players.map((a) => mapRosterAthlete(a, report)) })
+  );
+  if (lg.sport === 'football') return { split: true, sections: footballRoster(groups) };
+  if (!grouped) return { split: false, sections: groupByPosition(groups[0].players) };
+  // ESPN's own groups: MLB pitchers / catchers / infielders…, NHL centers / wings / defense / goalies.
+  return {
+    split: false,
+    sections: groups
+      .filter((g) => g.players.length)
+      .map((g, i) => ({ id: `${i}:${g.name}`, name: g.name ? g.name.replace(/^./, (c) => c.toUpperCase()) : 'Roster', players: g.players })),
+  };
+}
 
 // ---------- news ----------
 export async function getNews(lg) {

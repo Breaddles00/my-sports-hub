@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { calendarDays, getScoreboard, isoDayFromYmd, weekOptions, ymd, ymdFromIsoDay } from '../api.js';
-import { usePoll } from '../store.jsx';
+import { useApp, usePoll } from '../store.jsx';
 import GameCard from './GameCard.jsx';
-import { Empty, ErrorBox, Spinner } from './common.jsx';
+import { Empty, ErrorBox, Logo, Spinner } from './common.jsx';
 
 function addDays(ymdStr, n) {
   const d = new Date(`${isoDayFromYmd(ymdStr)}T12:00:00`);
@@ -89,6 +89,32 @@ function WeekNav({ data, sel, setSel }) {
   );
 }
 
+// Teams on bye this week / round (football, AFL), or without a game that day (MLB, NBA, NHL).
+// See getByes() in api.js. Click a team to open its page.
+function ByeStrip({ lg, byes, q }) {
+  const { openTeam } = useApp();
+  if (!byes?.teams?.length) return null;
+  const s = q.trim().toLowerCase();
+  const teams = s ? byes.teams.filter((t) => `${t.name} ${t.abbr}`.toLowerCase().includes(s)) : byes.teams;
+  if (!teams.length) return null;
+  const title = byes.kind === 'idle' ? 'No game' : byes.round ? `${byes.round} byes` : 'On bye';
+  return (
+    <section className={`day-group bye-strip bye-${byes.kind}`}>
+      <h3 className="day-head">
+        {title} <span className="bye-n">{teams.length}</span>
+      </h3>
+      <div className="bye-list">
+        {teams.map((t) => (
+          <button key={t.id || t.name} className="bye-team" disabled={!t.id} onClick={() => t.id && openTeam(lg.id, t.id)} title={t.name}>
+            <Logo src={t.logo} alt={t.name} size={22} />
+            <span>{t.short || t.name}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 const FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'in', label: 'Live' },
@@ -170,6 +196,7 @@ export default function Scoreboard({ lg }) {
           </div>
         </section>
       ))}
+      {data && filter === 'all' && data.events.length > 0 && <ByeStrip lg={lg} byes={data.byes} q={q} />}
     </div>
   );
 }
