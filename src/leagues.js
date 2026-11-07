@@ -1,0 +1,76 @@
+// League configuration. All data comes from ESPN's public JSON feeds
+// (the same ones espn.com uses), with Squiggle as a backup for the AFL ladder.
+
+export const LEAGUES = [
+  {
+    id: 'nfl',
+    name: 'NFL',
+    full: 'National Football League',
+    sport: 'football',
+    league: 'nfl',
+    mode: 'week',
+    accent: '#3b82f6',
+    periodName: 'Q',
+    standingsCols: ['wins', 'losses', 'ties', 'winPercent', 'pointsFor', 'pointsAgainst', 'differential', 'streak'],
+  },
+  {
+    id: 'ncaaf',
+    name: 'NCAAF',
+    full: 'NCAA Football (FBS)',
+    sport: 'football',
+    league: 'college-football',
+    mode: 'week',
+    accent: '#f59e0b',
+    periodName: 'Q',
+    scoreboardParams: { groups: '80', limit: '400' },
+    teamsParams: { groups: '80', limit: '400' },
+    standingsCols: ['vsConf', 'overall', 'wins', 'losses', 'winPercent', 'pointsFor', 'pointsAgainst', 'streak'],
+  },
+  {
+    id: 'mlb',
+    name: 'MLB',
+    full: 'Major League Baseball',
+    sport: 'baseball',
+    league: 'mlb',
+    mode: 'day',
+    accent: '#ef4444',
+    periodName: 'Inn',
+    standingsCols: ['wins', 'losses', 'winPercent', 'gamesBehind', 'Home', 'Road', 'differential', 'streak', 'Last Ten Games'],
+  },
+  {
+    id: 'nba',
+    name: 'NBA',
+    full: 'National Basketball Association',
+    sport: 'basketball',
+    league: 'nba',
+    mode: 'day',
+    accent: '#f97316',
+    periodName: 'Q',
+    standingsCols: ['wins', 'losses', 'winPercent', 'gamesBehind', 'Home', 'Road', 'avgPointsFor', 'avgPointsAgainst', 'streak', 'Last Ten Games'],
+  },
+  {
+    id: 'nhl',
+    name: 'NHL',
+    full: 'National Hockey League',
+    sport: 'hockey',
+    league: 'nhl',
+    mode: 'day',
+    accent: '#06b6d4',
+    periodName: 'P',
+    standingsCols: ['gamesPlayed', 'wins', 'losses', 'otLosses', 'points', 'pointsFor', 'pointsAgainst', 'differential', 'streak'],
+  },
+  {
+    id: 'afl',
+    name: 'AFL',
+    full: 'Australian Football League',
+    sport: 'australian-football',
+    league: 'afl',
+    mode: 'day',
+    accent: '#22c55e',
+    periodName: 'Q',
+    homeFirst: true, // Australian convention: "Home v Away"
+    standingsCols: ['gamesPlayed', 'wins', 'losses', 'ties', 'points', 'pointsFor', 'pointsAgainst', 'percentage', 'streak'],
+  },
+];
+
+export const LEAGUE_BY_ID = Object.fromEntries(LEAGUES.map((l) => [l.id, l]));
