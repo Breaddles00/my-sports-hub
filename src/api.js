@@ -509,9 +509,86 @@ export async function getTeamStats(lg, teamId) {
 }
 const HIDDEN_STATS = new Set(['isQualified', 'WARBR', 'offWARBR', 'defWARBR', 'zoneRating']);
 
+// ---------- injuries ----------
+// One ESPN injury object → { status, date, type, side, detail, returnDate, comment }.
+// Depth chart and roster athletes carry a thin copy (often just status + date); the
+// league-wide /injuries feed adds the injury, return date and ESPN's short note.
+const notSpecified = (s) => (s && !/^not specified$/i.test(s) ? s : '');
+export function mapInjury(inj) {
+  if (!inj || typeof inj !== 'object') return null;
+  const det = inj.details || {};
+  const out = {
+    status: inj.status || inj.type?.description || det.fantasyStatus?.description || '',
+    date: inj.date || inj.lastModified || '',
+    type: notSpecified(det.type || det.location || ''),
+    side: notSpecified(det.side || ''),
+    detail: notSpecified(det.detail || ''),
+    returnDate: det.returnDate || '',
+    comment: (inj.shortComment || inj.longComment || inj.comment || '').trim(),
+  };
+  return out.status || out.date || out.comment ? out : null;
+}
+
+const athleteIdOf = (a) => {
+  if (!a) return null;
+  if (a.id != null) return String(a.id);
+  const href = a.links?.find((l) => /\/id\/\d+/.test(l.href || ''))?.href || a.$ref || '';
+  return href.match(/\/(?:id|athletes)\/(\d+)/)?.[1] || null;
+};
+const nameKey = (s) => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+
+// League-wide injury report, indexed by athlete id and name. Cached for 5 minutes so
+// several starred teams in one league share a request. Never throws: no notes is fine.
+const injuryCache = new Map();
+export function getLeagueInjuries(lg) {
+  if (!lg.depthChart) return Promise.resolve(null);
+  const hit = injuryCache.get(lg.id);
+  if (hit && Date.now() - hit.t < 5 * 60 * 1000) return hit.p;
+  const p = getJSON(`${site(lg)}/injuries`)
+    .then((d) => {
+      const byId = new Map();
+      const byName = new Map();
+      for (const team of d.injuries || [])
+        for (const inj of team.injuries || []) {
+          const m = mapInjury(inj);
+          if (!m) continue;
+          const id = athleteIdOf(inj.athlete);
+          // Newest note wins if ESPN lists a player twice.
+          const keep = (map, k) => {
+            if (!k) return;
+            const old = map.get(k);
+            if (!old || new Date(m.date || 0) >= new Date(old.date || 0)) map.set(k, m);
+          };
+          keep(byId, id);
+          keep(byName, nameKey(inj.athlete?.displayName));
+        }
+      return { byId, byName };
+    })
+    .catch(() => {
+      injuryCache.delete(lg.id);
+      return null;
+    });
+  injuryCache.set(lg.id, { t: Date.now(), p });
+  return p;
+}
+
+// Best injury info for one athlete: the league report's entry (by id, then name) merged
+// over whatever the depth chart / roster athlete carried.
+function injuryFor(report, a) {
+  const own = mapInjury(a.injuries?.[0]);
+  const feed = report && (report.byId.get(athleteIdOf(a)) || report.byName.get(nameKey(a.displayName || a.fullName)));
+  if (!feed) return own;
+  if (!own) return feed;
+  const merged = { ...own };
+  for (const [k, v] of Object.entries(feed)) if (v) merged[k] = v;
+  // Keep the depth chart's own status: it's what the tag shows.
+  if (own.status) merged.status = own.status;
+  return merged;
+}
+
 // Depth chart (NFL, MLB, NBA, NHL; ESPN doesn't publish them for college football or AFL).
 export async function getDepthChart(lg, teamId) {
-  const d = await getJSON(`${site(lg)}/teams/${teamId}/depthcharts`);
+  const [d, report] = await Promise.all([getJSON(`${site(lg)}/teams/${teamId}/depthcharts`), getLeagueInjuries(lg)]);
   const unit = (name) => (/special/i.test(name) ? 2 : /\bD\b|defen|4-3|3-4|nickel|dime/i.test(name) ? 1 : 0);
   // ESPN lists football offense WRs first; show it the usual way (QB, RB, WR, TE, O-line).
   const order = lg.sport === 'football' ? ['QB', 'RB', 'FB', 'WR', 'TE', 'LT', 'LG', 'C', 'RG', 'RT'] : [];
@@ -530,6 +607,7 @@ export async function getDepthChart(lg, teamId) {
           name: a.displayName || a.shortName,
           short: a.shortName,
           status: a.injuries?.[0]?.status || '',
+          injury: injuryFor(report, a),
         })),
       })),
     }))
@@ -539,11 +617,14 @@ export async function getDepthChart(lg, teamId) {
 }
 
 export async function getTeamDetail(lg, teamId) {
-  const [info, schedule, roster] = await Promise.allSettled([
+  const [info, schedule, roster, injuries] = await Promise.allSettled([
     getJSON(`${site(lg)}/teams/${teamId}`),
     getJSON(`${site(lg)}/teams/${teamId}/schedule`),
     getJSON(`${site(lg)}/teams/${teamId}/roster`),
+    getLeagueInjuries(lg),
   ]);
+  const report = injuries.value || null;
+  const mapAthlete = (a) => mapRosterAthlete(a, report);
   const t = info.value?.team || {};
   const team = {
     id: teamId,
@@ -568,7 +649,7 @@ export async function getTeamDetail(lg, teamId) {
   }
   return { team, games, rosterGroups };
 }
-const mapAthlete = (a) => ({
+const mapRosterAthlete = (a, report) => ({
   id: a.id,
   name: a.displayName || a.fullName,
   jersey: a.jersey,
@@ -580,6 +661,7 @@ const mapAthlete = (a) => ({
   experience: a.experience?.years,
   college: a.college?.shortName || a.college?.name,
   status: a.injuries?.[0]?.status || '',
+  injury: a.injuries?.length ? injuryFor(report, a) : null,
 });
 
 // ---------- news ----------

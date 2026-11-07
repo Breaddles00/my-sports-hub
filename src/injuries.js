@@ -9,6 +9,10 @@
 // its own: every time a depth chart loads, Q and O players are stamped in localStorage,
 // and a player who is later Active (or no longer listed) within 7 days of their last
 // Q/O stamp gets the green "Active" tag. Players the app hasn't seen as Q/O never do.
+//
+// Each tag also carries `injury` (from src/api.js mapInjury: injury, note, update date,
+// return date) for the hover card. For "Active" the stamp keeps the last Q/O note too,
+// so the card can say what the player came back from.
 
 const KEY = 'sportshub.injuryHistory';
 const DAY = 24 * 3600 * 1000;
@@ -33,6 +37,13 @@ function load() {
   }
 }
 
+// Only what the hover card needs, to keep localStorage small.
+function slim(inj) {
+  if (!inj) return null;
+  const { type, side, detail, date, comment } = inj;
+  return { type, side, detail, date, comment: comment ? comment.slice(0, 300) : '' };
+}
+
 function save(hist) {
   try {
     localStorage.setItem(KEY, JSON.stringify(hist));
@@ -55,7 +66,7 @@ export function applyInjuryHistory(leagueId, charts, now = Date.now()) {
       for (const a of p.athletes) {
         const kind = injuryKind(a.status);
         const k = key(a);
-        if (k && (kind === 'q' || kind === 'out')) hist[k] = { s: kind, t: now };
+        if (k && (kind === 'q' || kind === 'out')) hist[k] = { s: kind, t: now, st: a.status, inj: slim(a.injury) };
       }
 
   const recentlyHurt = (a) => {
@@ -71,9 +82,17 @@ export function applyInjuryHistory(leagueId, charts, now = Date.now()) {
         const kind = injuryKind(a.status);
         let tag = null;
         if (kind === 'active' || kind === '') {
-          if (key(a) && recentlyHurt(a)) tag = { label: 'Active', kind: 'active' };
+          if (key(a) && recentlyHurt(a)) {
+            const h = hist[key(a)];
+            tag = {
+              label: 'Active',
+              kind: 'active',
+              injury: a.injury,
+              previous: { status: h.st || (h.s === 'out' ? 'Out' : 'Questionable'), seen: h.t, injury: h.inj || null },
+            };
+          }
         } else {
-          tag = { label: a.status, kind };
+          tag = { label: a.status, kind, injury: a.injury };
         }
         return { ...a, tag };
       }),

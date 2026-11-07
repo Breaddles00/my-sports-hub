@@ -3,6 +3,7 @@ import { LEAGUE_BY_ID } from '../leagues.js';
 import { fmtDate, fmtTime, getTeamDetail, getTeams, openExternal } from '../api.js';
 import { useApp, usePoll } from '../store.jsx';
 import { Empty, ErrorBox, Logo, Spinner, Star, Tabs } from './common.jsx';
+import { InjuryTag } from './InjuryTag.jsx';
 
 export function TeamsGrid({ lg }) {
   const { openTeam, isFav, toggleFav } = useApp();
@@ -187,7 +188,7 @@ export function TeamDetail({ leagueId, teamId }) {
                           <td>{p.age}</td>
                           <td>{p.height}</td>
                           <td>{p.weight}</td>
-                          <td className="left">{p.status && <span className="chip warn">{p.status}</span>}</td>
+                          <td className="left">{p.status && <InjuryTag tag={{ label: p.status, kind: 'other', injury: p.injury }} className="warn" />}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -1735,6 +1735,84 @@ td.strong {
   --inj: #16a34a;
 }
 
+/* Injury hover card (src/components/InjuryTag.jsx). */
+.inj-tag {
+  cursor: help;
+  outline: none;
+}
+.inj-tag:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.inj-card {
+  --inj: var(--warn);
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-2);
+  border-left: 3px solid var(--inj);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: left;
+  animation: inj-card-in 0.12s ease-out;
+}
+.inj-card-out {
+  --inj: #ef4444;
+}
+.inj-card-ir {
+  --inj: #dc2626;
+}
+.inj-card-q {
+  --inj: #fb923c;
+}
+.inj-card-active {
+  --inj: #22c55e;
+}
+.inj-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin-bottom: 4px;
+}
+.inj-card-status {
+  font-weight: 750;
+  color: var(--inj);
+}
+.inj-card-what {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.inj-card p {
+  margin: 4px 0 0;
+}
+.inj-card-prev {
+  color: var(--text-2);
+}
+.inj-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11.5px;
+}
+@keyframes inj-card-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ---------- league logos ---------- */
 .league-logo {
   object-fit: contain;

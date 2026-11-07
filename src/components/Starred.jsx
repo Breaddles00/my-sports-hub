@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LEAGUES, LEAGUE_BY_ID } from '../leagues.js';
 import { fmtDate, fmtTime, getDepthChart, getTeamNews, getTeamStats, getTeamSummary } from '../api.js';
 import { applyInjuryHistory } from '../injuries.js';
+import { InjuryTag } from './InjuryTag.jsx';
 import { useApp, usePoll } from '../store.jsx';
 import { NewsGrid } from './News.jsx';
 import { Empty, ErrorBox, Logo, Spinner, Star, Tabs } from './common.jsx';
@@ -543,7 +544,7 @@ function DepthChart({ charts }) {
                       {a ? (
                         <>
                           {a.name}
-                          {a.tag && <span className={`chip ${a.tag.kind === 'other' ? 'warn' : `inj-${a.tag.kind}`}`}>{a.tag.label}</span>}
+                          <InjuryTag tag={a.tag} />
                         </>
                       ) : (
                         ''
