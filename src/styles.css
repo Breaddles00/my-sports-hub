@@ -2153,9 +2153,33 @@ td.strong {
   .team-link {
     font-size: 14px;
   }
+  /* schedule rows: the team's logo stays, its name and the league tag go, the opponent can shorten */
+  .sched-row {
+    gap: 6px;
+    padding: 8px 6px;
+  }
   .sched-date {
-    width: 74px;
+    width: 70px;
+    flex: none;
     font-size: 12px;
+  }
+  .sched-row .sched-me,
+  .sched-row .league-tag {
+    display: none;
+  }
+  .sched-vs {
+    width: 16px;
+    flex: none;
+  }
+  .sched-opp {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sched-row > .muted,
+  .sched-row > .res {
+    flex: none;
   }
 
   .settings .row {
