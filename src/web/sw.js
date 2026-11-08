@@ -28,16 +28,23 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // ESPN, Squiggle, logos: straight to the network
+  const fromNetwork = () =>
+    fetch(req).then((res) => {
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+      }
+      return res;
+    });
+  // app.js / app.css carry the build id (?v=…), so a cached copy is always the right one.
+  if (url.searchParams.has('v')) {
+    e.respondWith(caches.match(req).then((hit) => hit || fromNetwork()));
+    return;
+  }
   e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      })
-      .catch(() => caches.match(req).then((hit) => hit || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())))
+    fromNetwork().catch(() =>
+      caches.match(req).then((hit) => hit || (req.mode === 'navigate' ? caches.match('index.html') : fetch(req)))
+    )
   );
 });
 
