@@ -4,6 +4,55 @@ import { DEFAULT_SETTINGS, useApp } from '../store.jsx';
 import { openExternal } from '../api.js';
 import { Logo } from './common.jsx';
 
+const RELEASES_URL = 'https://github.com/Breaddles00/my-sports-hub/releases/latest';
+const isWeb = () => window.api?.platform === 'web';
+
+// Web version: nothing to install, a reload always gets the newest build.
+function WebPanel() {
+  const build = window.api?.build || {};
+  const installed = window.api?.standalone?.();
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const built = build.date ? new Date(build.date).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+  return (
+    <section className="panel">
+      <h4>Web version</h4>
+      <div className="row">
+        <span>
+          My Sports Hub {build.version}
+          <small className="muted">
+            {build.sha ? `Build ${build.sha}` : 'Local build'}
+            {built && ` · ${built}`} · Reloading the page picks up new versions
+          </small>
+        </span>
+        <button className="btn" onClick={() => location.reload()}>
+          Reload
+        </button>
+      </div>
+      {!installed && (
+        <div className="row">
+          <span>
+            Add to Home Screen
+            <small className="muted">
+              {ios
+                ? 'In Safari, tap Share, then "Add to Home Screen". It then opens full screen like an app (and can show notifications).'
+                : 'In Chrome, open the ⋮ menu and choose "Add to Home screen" or "Install app" to open it full screen like an app.'}
+            </small>
+          </span>
+        </div>
+      )}
+      <div className="row">
+        <span>
+          Windows app
+          <small className="muted">Starred teams and settings are kept separately on each device</small>
+        </span>
+        <button className="btn" onClick={() => openExternal(RELEASES_URL)}>
+          Download
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function UpdatesPanel({ version }) {
   const [state, setState] = useState(null);
   const check = async () => {
@@ -116,6 +165,15 @@ export default function Settings() {
           </span>
           <input type="checkbox" checked={settings.notifyAll} onChange={(e) => set({ notifyAll: e.target.checked })} />
         </label>
+        {isWeb() && (
+          <p className="muted small">
+            {perm === 'unsupported'
+              ? /iPhone|iPad|iPod/.test(navigator.userAgent)
+                ? 'On iPhone, notifications need the site added to your Home Screen first (see Web version below).'
+                : "This browser doesn't support notifications."
+              : 'Alerts only arrive while My Sports Hub is open in a tab or on your home screen.'}
+          </p>
+        )}
         <div className="row">
           <span className="muted small">Permission: {perm}</span>
           <button className="btn" onClick={testNotify}>
@@ -173,7 +231,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <UpdatesPanel version={version} />
+      {isWeb() ? <WebPanel /> : <UpdatesPanel version={version} />}
 
       <section className="panel">
         <h4>About</h4>

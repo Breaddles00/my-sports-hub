@@ -2,12 +2,13 @@
   "name": "my-sports-hub",
   "productName": "My Sports Hub",
   "version": "1.1.0",
-  "description": "My Sports Hub — live scores, schedules, standings and stats for NFL, NCAA Football, MLB, NBA, NHL and AFL.",
+  "description": "My Sports Hub \u2014 live scores, schedules, standings and stats for NFL, NCAA Football, MLB, NBA, NHL and AFL.",
   "author": "Breaddles00",
   "license": "MIT",
   "private": true,
   "scripts": {
     "build:ui": "node scripts/build.mjs",
+    "build:web": "node scripts/build.mjs --web",
     "dev": "npm run build:ui && tauri dev",
     "dist": "npm run build:ui && tauri build"
   },

@@ -1901,3 +1901,254 @@ td.strong {
 .roster tbody:first-of-type tr.roster-group th {
   padding-top: 6px;
 }
+
+/* ---------- phones and narrow windows (mainly the web version) ---------- */
+/* The sidebar becomes a bottom tab bar, the drawer goes full screen and wide content scrolls sideways. */
+@media (max-width: 720px) {
+  .app {
+    height: 100dvh;
+  }
+  .titlebar,
+  .titlebar.win {
+    height: auto;
+    min-height: 44px;
+    padding: env(safe-area-inset-top) max(10px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+    gap: 8px;
+  }
+  .titlebar .muted.small {
+    font-size: 11px;
+  }
+  .body {
+    flex-direction: column;
+  }
+  .main {
+    padding: 14px max(12px, env(safe-area-inset-right)) 28px max(12px, env(safe-area-inset-left));
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* bottom tab bar */
+  .sidebar {
+    order: 2;
+    width: 100%;
+    flex-direction: row;
+    gap: 0;
+    padding: 4px max(4px, env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+    border-right: 0;
+    border-top: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+  .sidebar .nav-sep,
+  .sidebar .spacer {
+    display: none;
+  }
+  .nav-item {
+    flex: 1 1 0;
+    min-width: 40px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 0 4px;
+    text-align: center;
+  }
+  .nav-item:hover {
+    background: none;
+  }
+  .nav-item.active {
+    background: none;
+  }
+  .nav-item.active::before {
+    left: 25%;
+    right: 25%;
+    top: -4px;
+    bottom: auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+  }
+  .nav-ic {
+    width: 26px;
+    height: 26px;
+    background: none;
+  }
+  .nav-label,
+  .nav-sep {
+    display: block;
+  }
+  .nav-label {
+    flex: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .nav-item .badge {
+    position: absolute;
+    top: 0;
+    left: calc(50% + 4px);
+    right: auto;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+  }
+
+  /* headings, tabs, toolbars */
+  .league-head h1,
+  .settings h2 {
+    font-size: 20px;
+  }
+  .league-head h1::before {
+    height: 20px;
+  }
+  .home-hero {
+    padding: 16px;
+    gap: 14px;
+  }
+  .home-hero h1 {
+    font-size: 22px;
+  }
+  .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab {
+    padding: 9px 10px;
+    white-space: nowrap;
+    flex: none;
+  }
+  .toolbar {
+    margin: 12px 0;
+    gap: 8px;
+  }
+  .search,
+  .search.wide {
+    width: 100%;
+    flex: 1 1 160px;
+  }
+  /* 16px stops iOS zooming in when a field is focused */
+  .search,
+  .date-input,
+  .week-select,
+  .settings select,
+  select {
+    font-size: 16px;
+  }
+  .week-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .date-nav {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .date-label {
+    min-width: 0;
+    flex: 1;
+  }
+  .seg {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .seg button {
+    padding: 5px 9px;
+    white-space: nowrap;
+  }
+  .star-picker {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .star-picker > * {
+    flex: none;
+  }
+
+  /* grids collapse to one column */
+  .game-grid,
+  .compact-grid,
+  .news-grid,
+  .star-cards,
+  .stat-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .team-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .standings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .panel {
+    padding: 12px;
+  }
+  .panel,
+  .table-wrap {
+    max-width: 100%;
+  }
+  .panel:has(> table),
+  .panel:has(> .table-wrap) {
+    overflow-x: auto;
+  }
+  th,
+  td {
+    padding: 6px 6px;
+  }
+
+  /* drawer goes full screen */
+  .drawer-backdrop {
+    inset: 0;
+  }
+  .drawer,
+  .drawer.wide {
+    width: 100%;
+    border-left: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .drawer-close {
+    top: calc(10px + env(safe-area-inset-top));
+    right: 10px;
+    width: 36px;
+    height: 36px;
+  }
+  .gd-score {
+    gap: 8px;
+  }
+  .gd-nums {
+    font-size: 34px;
+    gap: 8px;
+  }
+  .gd-time {
+    font-size: 20px;
+  }
+  .team-link {
+    font-size: 14px;
+  }
+  .sched-date {
+    width: 74px;
+    font-size: 12px;
+  }
+
+  .settings .row {
+    flex-wrap: wrap;
+  }
+  .settings .row > span {
+    flex: 1 1 200px;
+  }
+  .inj-card {
+    max-width: calc(100vw - 16px);
+  }
+}

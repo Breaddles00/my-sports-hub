@@ -1,0 +1,64 @@
+# Every push to main that touches the UI rebuilds the web version and publishes it to GitHub Pages
+# (https://breaddles00.github.io/my-sports-hub/). Same React code as the Windows app, built with
+# `node scripts/build.mjs --web`. If ESPN or Squiggle ever refuse requests from the browser, deploy the
+# proxy in worker/ and set the repository variable PROXY_URL to its address (see worker/README.md).
+name: Publish web version
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/build.mjs'
+      - 'package.json'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --no-save esbuild@^0.25.0 react@^19.1.0 react-dom@^19.1.0
+
+      - name: Build web version
+        env:
+          MSH_PROXY_URL: ${{ vars.PROXY_URL }}
+        run: node scripts/build.mjs --web
+
+      - name: Check files
+        run: |
+          set -e
+          for f in index.html app.js app.css sw.js manifest.webmanifest icons/icon-192.png icons/icon-512.png; do test -s "dist-web/$f" || { echo "dist-web/$f missing"; exit 1; }; done
+          ! grep -q '%BUILD_ID%\|%CONNECT_SRC%' dist-web/index.html dist-web/sw.js
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist-web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

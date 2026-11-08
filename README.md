@@ -1,6 +1,6 @@
 # My Sports Hub
 
-A Windows 11 desktop app (React + [Tauri 2](https://v2.tauri.app)) with live scores, schedules, standings, box scores, rosters and news for:
+A Windows 11 desktop app (React + [Tauri 2](https://v2.tauri.app)), also [on the web](https://breaddles00.github.io/my-sports-hub/), with live scores, schedules, standings, box scores, rosters and news for:
 
 **NFL · NCAA Football (FBS) · MLB · NBA · NHL · AFL**
 
@@ -11,6 +11,18 @@ Download **`My-Sports-Hub-Setup-x.x.x.exe`** from the [latest release](https://g
 Windows SmartScreen may warn about an "unknown publisher" because the app isn't code-signed. Click **More info → Run anyway**.
 
 A **`My-Sports-Hub-Portable-x.x.x.exe`** that runs without installing is also attached to each release. It needs the Microsoft Edge WebView2 runtime, which Windows 11 already has.
+
+## Web version
+
+The same app also runs in a browser: **https://breaddles00.github.io/my-sports-hub/**. It shows the same scores, schedules, standings, Starred tabs, game centre and news. On a phone the sidebar becomes a tab bar along the bottom.
+
+- **Add it to your home screen** to open it full screen like an app. On iPhone, use Safari's **Share → Add to Home Screen**. On Android, use Chrome's **⋮ → Add to Home screen**.
+- **Starred teams and settings are kept separately** on each device and browser.
+- **Notifications** only arrive while the site is open. On iPhone they need the home-screen version.
+- The site always runs the newest build, so there's no updater. Every push to `main` that changes the UI republishes it ([`web.yml`](.github/workflows/web.yml)).
+- Data comes straight from ESPN and Squiggle in the browser. If they ever block that, [`worker/`](worker/README.md) has a small optional Cloudflare proxy to switch on.
+
+Build it locally with `node scripts/build.mjs --web`. The output goes to `dist-web/`; serve that folder with any static server.
 
 ## Automatic updates
 
@@ -57,6 +69,7 @@ Building needs [Node.js](https://nodejs.org) and [Rust](https://rustup.rs) with 
 npm install
 npm run dev            # build the UI and run the app (debug build, skips installing updates)
 npm run dist           # release build: src-tauri/target/release/ and the installer in bundle/nsis/
+npm run build:web      # web version into dist-web/ (published to GitHub Pages by web.yml)
 ```
 
 ```

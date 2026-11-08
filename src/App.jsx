@@ -35,7 +35,9 @@ function notify(title, body, icon) {
     }
   };
   if (Notification.permission === 'granted') fire();
-  else if (Notification.permission === 'default') Notification.requestPermission().then((p) => p === 'granted' && fire());
+  // Browsers only allow the permission prompt after a tap, so the web version asks from Settings instead.
+  else if (Notification.permission === 'default' && window.api?.platform !== 'web')
+    Notification.requestPermission().then((p) => p === 'granted' && fire());
 }
 
 function useScoreAlerts(hubData) {

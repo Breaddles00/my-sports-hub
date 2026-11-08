@@ -9,6 +9,12 @@ on:
     paths-ignore:
       - '**.md'
       - '.gitignore'
+      # web-only files (see web.yml)
+      - 'src/web/**'
+      - 'src/web-api.js'
+      - 'src/main-web.jsx'
+      - 'worker/**'
+      - '.github/workflows/web.yml'
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-platform="web">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' %CONNECT_SRC%; font-src 'self' data:; manifest-src 'self'; worker-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f17" />
+    <meta name="description" content="Live scores, schedules, standings and stats for NFL, NCAA Football, MLB, NBA, NHL and AFL." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sports Hub" />
+    <title>My Sports Hub</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="app.css?v=%BUILD_ID%" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>My Sports Hub needs JavaScript turned on.</noscript>
+    <script src="app.js?v=%BUILD_ID%"></script>
+  </body>
+</html>
