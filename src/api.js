@@ -549,13 +549,34 @@ async function getStandingsTeamIds(lg, params) {
   return ids;
 }
 
+// Team list from the standings feed. Used when /teams can't be reached: ESPN refuses
+// /teams from browsers (web version without the proxy), but allows standings.
+async function getTeamsFromStandings(lg) {
+  const d = await getJSON(`${STANDINGS}/${lg.sport}/${lg.league}/standings`, lg.teamsFromStandings || {});
+  const out = [];
+  const walk = (o) => {
+    if (!o || typeof o !== 'object') return;
+    (o.standings?.entries || []).forEach((e) => e.team?.id && out.push(e.team));
+    (o.children || []).forEach(walk);
+  };
+  walk(d);
+  return out;
+}
+
 export async function getTeams(lg) {
-  const [d, keepIds] = await Promise.all([
-    getJSON(`${site(lg)}/teams`, lg.teamsParams || { limit: '100' }),
-    lg.teamsFromStandings ? getStandingsTeamIds(lg, lg.teamsFromStandings).catch(() => null) : null,
-  ]);
-  let teams = (d.sports?.[0]?.leagues?.[0]?.teams || []).map((t) => t.team).filter(Boolean);
-  if (keepIds && keepIds.size >= 100) teams = teams.filter((t) => keepIds.has(String(t.id)));
+  let teams;
+  try {
+    const [d, keepIds] = await Promise.all([
+      getJSON(`${site(lg)}/teams`, lg.teamsParams || { limit: '100' }),
+      lg.teamsFromStandings ? getStandingsTeamIds(lg, lg.teamsFromStandings).catch(() => null) : null,
+    ]);
+    teams = (d.sports?.[0]?.leagues?.[0]?.teams || []).map((t) => t.team).filter(Boolean);
+    if (keepIds && keepIds.size >= 100) teams = teams.filter((t) => keepIds.has(String(t.id)));
+  } catch (e) {
+    const fromStandings = await getTeamsFromStandings(lg).catch(() => []);
+    if (!fromStandings.length) throw e;
+    teams = fromStandings;
+  }
   const exclude = new Set(lg.excludeTeamIds || []);
   const seen = new Set();
   teams = teams.filter((t) => {
@@ -590,16 +611,21 @@ export function getTeamsCached(lg) {
   return p;
 }
 
+// /teams/{id} is refused from browsers (web version without the proxy), but the team
+// schedule carries a smaller team object (name, logo, colour, recordSummary, standingSummary).
+const teamObj = (info, schedule) => info.value?.team || schedule.value?.team || {};
+const teamRecord = (t) => t.record?.items?.find((i) => i.type === 'total')?.summary || t.record?.items?.[0]?.summary || t.recordSummary || '';
+
 function mapTeamInfo(t, teamId) {
   return {
     id: teamId,
     name: t.displayName,
-    short: t.shortDisplayName,
+    short: t.shortDisplayName || t.name,
     abbr: t.abbreviation,
     location: t.location,
     logo: teamLogo(t),
     color: t.color ? `#${t.color}` : null,
-    record: t.record?.items?.find((i) => i.type === 'total')?.summary || t.record?.items?.[0]?.summary || '',
+    record: teamRecord(t),
     standing: t.standingSummary || '',
   };
 }
@@ -611,7 +637,7 @@ export async function getTeamSummary(lg, teamId) {
     getJSON(`${site(lg)}/teams/${teamId}/schedule`),
   ]);
   if (info.status === 'rejected' && schedule.status === 'rejected') throw info.reason;
-  const team = mapTeamInfo(info.value?.team || {}, teamId);
+  const team = mapTeamInfo(teamObj(info, schedule), teamId);
   const games = (schedule.value?.events || []).map((e) => normalizeEvent(e, lg)).sort((a, b) => new Date(a.date) - new Date(b.date));
   return { leagueId: lg.id, team, games };
 }
@@ -790,18 +816,18 @@ export async function getTeamDetail(lg, teamId) {
   ]);
   const report = injuries.value || null;
   const mapAthlete = (a) => mapRosterAthlete(a, report);
-  const t = info.value?.team || {};
+  const t = teamObj(info, schedule);
   const team = {
     id: teamId,
     name: t.displayName,
     abbr: t.abbreviation,
     logo: teamLogo(t),
     color: t.color ? `#${t.color}` : null,
-    record: t.record?.items?.find((i) => i.type === 'total')?.summary || t.record?.items?.[0]?.summary || '',
+    record: teamRecord(t),
     standing: t.standingSummary || '',
     venue: t.franchise?.venue?.fullName || '',
     recordStats: (t.record?.items?.[0]?.stats || []).filter((s) => ['avgPointsFor', 'avgPointsAgainst', 'pointsFor', 'pointsAgainst', 'streak', 'differential'].includes(s.name)),
-    link: t.links?.find((l) => (l.rel || []).includes('clubhouse'))?.href,
+    link: t.links?.find((l) => (l.rel || []).includes('clubhouse'))?.href || t.clubhouse,
   };
   const games = (schedule.value?.events || []).map((e) => normalizeEvent(e, lg)).sort((a, b) => new Date(a.date) - new Date(b.date));
 

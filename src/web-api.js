@@ -48,19 +48,26 @@
 
   // ESPN allows some endpoints from the browser and not others on the same host (e.g. scoreboard yes,
   // /teams and depth charts no), so the route is remembered per endpoint shape with ids blanked out.
+  const NEEDS_PROXY = "This part isn't available in the web version yet (it needs the data proxy). The Windows app has it.";
   const routeKey = (u) => u.hostname + u.pathname.replace(/\/\d+(?=\/|$)/g, '/#');
 
   async function load(parsed) {
     const key = routeKey(parsed);
     const viaProxy = () => fetchJson(`${PROXY}/?url=${encodeURIComponent(parsed.href)}`);
     if (PROXY && route[key] === 'proxy') return viaProxy();
+    if (!PROXY && route[key] === 'blocked') throw new Error(NEEDS_PROXY);
     try {
       return await fetchJson(parsed.href);
     } catch (e) {
       // A CORS refusal shows up as a TypeError with no status. HTTP errors and timeouts are real failures.
       const blocked = !e.http && e.name !== 'AbortError' && navigator.onLine !== false;
       if (!blocked) throw e;
-      if (!PROXY) throw new Error(`${parsed.hostname} blocks this in the browser until the data proxy is set up (or you're offline)`);
+      if (!PROXY) {
+        // Remember it for this session so the same endpoint fails fast instead of refetching.
+        route[key] = 'blocked';
+        saveRoute();
+        throw new Error(NEEDS_PROXY);
+      }
       const data = await viaProxy();
       route[key] = 'proxy';
       saveRoute();
