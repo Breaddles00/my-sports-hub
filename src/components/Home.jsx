@@ -1,12 +1,19 @@
 import { LEAGUES } from '../leagues.js';
-import { useApp } from '../store.jsx';
+import { seasonPhase } from '../api.js';
+import { useApp, useNow } from '../store.jsx';
 import GameCard from './GameCard.jsx';
 import { Empty, Logo, Spinner } from './common.jsx';
+import { SeasonCard, hasCountdown, shortCountdown } from './SeasonCountdown.jsx';
 
-export default function Home({ hub, onNavigate }) {
+export default function Home({ hub, seasons = {}, onNavigate }) {
   const { favorites, settings, openTeam } = useApp();
+  const now = useNow(60000);
   const leagues = LEAGUES.filter((l) => !settings.hiddenLeagues.includes(l.id));
-  const all = leagues.flatMap((l) => hub.data?.[l.id]?.events || []);
+  // Off-season leagues: ESPN still serves their last game day, which isn't "today's slate".
+  const isOff = (l) => seasonPhase(hub.data?.[l.id]) === 'off';
+  const inSeason = leagues.filter((l) => !isOff(l));
+  const countdowns = leagues.filter((l) => seasons[l.id] && (seasons[l.id].phase === 'off' || hasCountdown(seasons[l.id], now)));
+  const all = inSeason.flatMap((l) => hub.data?.[l.id]?.events || []);
   const live = all.filter((g) => g.state === 'in');
   const favKeys = new Set(Object.keys(favorites));
   const favGames = all.filter((g) => g.competitors.some((c) => favKeys.has(`${g.leagueId}:${c.id}`)));
@@ -28,7 +35,8 @@ export default function Home({ hub, onNavigate }) {
             )}
           </h1>
           <p className="muted">
-            {all.length} games on today's slates across {leagues.length} leagues · times shown in your local time zone (
+            {all.length} games on today's slates across {inSeason.length} leagues
+            {inSeason.length < leagues.length && ` (${leagues.length - inSeason.length} in the off-season)`} · times shown in your local time zone (
             {Intl.DateTimeFormat().resolvedOptions().timeZone})
           </p>
         </div>
@@ -36,10 +44,25 @@ export default function Home({ hub, onNavigate }) {
           {leagues.map((l) => {
             const evs = hub.data?.[l.id]?.events || [];
             const n = evs.filter((e) => e.state === 'in').length;
+            const off = isOff(l);
+            const cd = off ? shortCountdown(seasons[l.id], now) : null;
+            const status = hub.data?.[l.id]?.error
+              ? 'unavailable'
+              : n
+                ? `${n} live`
+                : off
+                  ? cd
+                    ? /^(Today|Tomorrow)$/.test(cd)
+                      ? `Back ${cd.toLowerCase()}`
+                      : cd === 'Starting now'
+                        ? cd
+                        : `Back in ${cd}`
+                    : 'Off-season'
+                  : `${evs.length} game${evs.length === 1 ? '' : 's'}`;
             return (
-              <button key={l.id} className="league-pill" style={{ '--lg': l.accent }} onClick={() => onNavigate(l.id)}>
+              <button key={l.id} className={`league-pill ${off ? 'off' : ''}`} style={{ '--lg': l.accent }} onClick={() => onNavigate(l.id)}>
                 <strong>{l.name}</strong>
-                <span>{hub.data?.[l.id]?.error ? 'unavailable' : n ? `${n} live` : `${evs.length} games`}</span>
+                <span>{status}</span>
               </button>
             );
           })}
@@ -97,7 +120,18 @@ export default function Home({ hub, onNavigate }) {
         )}
       </section>
 
-      {leagues.map((l) => {
+      {countdowns.length > 0 && (
+        <section>
+          <h2 className="section-title">⏳ Season countdowns</h2>
+          <div className="ssn-grid">
+            {countdowns.map((l) => (
+              <SeasonCard key={l.id} lg={l} info={seasons[l.id]} onClick={() => onNavigate(l.id)} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {inSeason.map((l) => {
         const evs = (hub.data?.[l.id]?.events || []).filter((g) => g.state !== 'in');
         if (!evs.length) return null;
         return (

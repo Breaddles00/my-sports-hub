@@ -13,7 +13,8 @@ import {
 } from '../api.js';
 import { applyInjuryHistory, injuryKind } from '../injuries.js';
 import { InjuryTag } from './InjuryTag.jsx';
-import { useApp, usePoll } from '../store.jsx';
+import { useApp, useNow, usePoll } from '../store.jsx';
+import { hasCountdown, openerDate, shortCountdown } from './SeasonCountdown.jsx';
 import { NewsGrid } from './News.jsx';
 import { Empty, ErrorBox, Logo, Spinner, Star, Tabs } from './common.jsx';
 
@@ -62,7 +63,7 @@ function Result({ g, m }) {
 const vsWord = (lg, home) => (lg.homeFirst ? (home ? 'v' : '@') : home ? 'vs' : '@');
 
 // ---------- page ----------
-export default function Starred({ hub }) {
+export default function Starred({ hub, seasons = {} }) {
   const { favorites } = useApp();
   const teams = useMemo(
     () =>
@@ -127,7 +128,7 @@ export default function Starred({ hub }) {
         <Tabs tabs={tabs} value={tab} onChange={setTab} />
       </div>
 
-      {tab === 'schedule' && <ScheduleTab key={scope} teams={selected} single={single} hub={hub} onPick={setSel} />}
+      {tab === 'schedule' && <ScheduleTab key={scope} teams={selected} single={single} hub={hub} seasons={seasons} onPick={setSel} />}
       {tab === 'news' && <NewsTab key={scope} teams={selected} />}
       {tab === 'stats' && <StatsTab key={scope} teams={selected} single={single} onPick={setSel} />}
       {tab === 'roster' && <RosterTab key={scope} teams={selected} single={single} />}
@@ -150,7 +151,7 @@ async function teamSchedule(lg, id) {
   return { ...s, byes };
 }
 
-function ScheduleTab({ teams, single, hub, onPick }) {
+function ScheduleTab({ teams, single, hub, seasons, onPick }) {
   const { data, error, loading, refresh } = usePoll(() => perTeam(teams, teamSchedule), `starred-sched:${teams.map(favKey)}`, {
     isLive: (d) => Object.values(d).some((s) => s.games?.some((g) => g.state === 'in')),
   });
@@ -194,7 +195,7 @@ function ScheduleTab({ teams, single, hub, onPick }) {
     <div className="starred-body">
       <div className={`star-cards ${single ? 'single' : ''}`}>
         {entries.map((e) => (
-          <TeamCard key={favKey(e.f)} {...e} single={single} onPick={onPick} />
+          <TeamCard key={favKey(e.f)} {...e} season={seasons[e.lg.id]} single={single} onPick={onPick} />
         ))}
       </div>
       <div className="star-cols">
@@ -235,8 +236,9 @@ function ScheduleTab({ teams, single, hub, onPick }) {
   );
 }
 
-function TeamCard({ f, lg, s, games, single, onPick }) {
+function TeamCard({ f, lg, s, games, season, single, onPick }) {
   const { openTeam, toggleFav } = useApp();
+  const now = useNow(60000);
   const t = s.team || {};
   const live = games.find((g) => g.state === 'in');
   const next = games.find((g) => g.state === 'pre');
@@ -277,7 +279,16 @@ function TeamCard({ f, lg, s, games, single, onPick }) {
             </div>
           )}
           {next && <MiniGame label="Next" g={next} f={f} lg={lg} />}
-          {!live && !last && !next && !bye && <span className="muted small">No games on the schedule</span>}
+          {/* Off-season: no next game yet, so count down to the league's next season. */}
+          {!live && !next && !bye && hasCountdown(season, now) && (
+            <div className="mini-game bye ssn-mini" title={`${lg.opener} · ${openerDate(season)}`}>
+              <span className="mg-label">{season.phase === 'pre' ? 'Reg' : 'Back'}</span>
+              <span className="small">
+                <strong>{shortCountdown(season, now)}</strong> <span className="muted">· {lg.opener} {fmtDate(season.opener.date)}</span>
+              </span>
+            </div>
+          )}
+          {!live && !last && !next && !bye && !hasCountdown(season, now) && <span className="muted small">No games on the schedule</span>}
         </div>
       )}
       {single && (

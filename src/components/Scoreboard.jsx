@@ -3,6 +3,7 @@ import { calendarDays, getScoreboard, isoDayFromYmd, weekOptions, ymd, ymdFromIs
 import { useApp, usePoll } from '../store.jsx';
 import GameCard from './GameCard.jsx';
 import { Empty, ErrorBox, Logo, Spinner } from './common.jsx';
+import { SeasonBanner } from './SeasonCountdown.jsx';
 
 function addDays(ymdStr, n) {
   const d = new Date(`${isoDayFromYmd(ymdStr)}T12:00:00`);
@@ -122,7 +123,7 @@ const FILTERS = [
   { id: 'post', label: 'Final' },
 ];
 
-export default function Scoreboard({ lg }) {
+export default function Scoreboard({ lg, season }) {
   const [sel, setSel] = useState(null);
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
@@ -165,6 +166,7 @@ export default function Scoreboard({ lg }) {
 
   return (
     <div className="scoreboard">
+      <SeasonBanner lg={lg} info={season} />
       <div className="toolbar">
         {data && (lg.mode === 'week' ? <WeekNav data={data} sel={sel} setSel={setSel} /> : <DayNav data={data} sel={sel} setSel={setSel} />)}
         <span className="spacer" />
@@ -183,7 +185,11 @@ export default function Scoreboard({ lg }) {
       {error && !data && <ErrorBox error={error} onRetry={refresh} />}
       {data && !events.length && (
         <Empty title={data.events.length ? 'No games match this filter' : 'No games scheduled'} icon="📅">
-          {data.events.length ? 'Try a different filter.' : 'Use the arrows to browse other game days — the league may be in its off-season.'}
+          {data.events.length
+            ? 'Try a different filter.'
+            : season?.phase === 'off'
+              ? 'The league is in its off-season. Use the arrows to browse last season.'
+              : 'Use the arrows to browse other game days — the league may be in its off-season.'}
         </Empty>
       )}
       {byDay.map(([day, list]) => (

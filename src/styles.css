@@ -1902,6 +1902,120 @@ td.strong {
   padding-top: 6px;
 }
 
+/* ---------- off-season countdown ---------- */
+.ssn-banner {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--lg);
+  background: radial-gradient(900px 220px at 0% 0%, color-mix(in srgb, var(--lg) 16%, transparent), transparent 65%), var(--panel);
+}
+.ssn-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.ssn-head h2 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.ssn-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--lg);
+  background: color-mix(in srgb, var(--lg) 14%, transparent);
+}
+.ssn-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+.ssn-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 76px;
+  padding: 10px 14px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.ssn-tile strong {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ssn-tile span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+}
+.ssn-lines p {
+  margin: 3px 0;
+  line-height: 1.45;
+}
+.ssn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 10px;
+}
+.ssn-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--lg);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.ssn-card:hover {
+  background: var(--hover);
+}
+.ssn-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.ssn-card-count {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.ssn-card-count strong {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.ssn-card-count span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.league-pill.off {
+  border-top-style: dashed;
+}
+.ssn-mini strong {
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- phones and narrow windows (mainly the web version) ---------- */
 /* The sidebar becomes a bottom tab bar, the drawer goes full screen and wide content scrolls sideways. */
 @media (max-width: 720px) {
@@ -2190,5 +2304,27 @@ td.strong {
   }
   .inj-card {
     max-width: calc(100vw - 16px);
+  }
+}
+
+/* off-season countdown on phones */
+@media (max-width: 720px) {
+  .ssn-banner {
+    padding: 14px;
+  }
+  .ssn-count {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .ssn-tile {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 4px 6px;
+  }
+  .ssn-tile strong {
+    font-size: 24px;
+  }
+  .ssn-grid {
+    grid-template-columns: 1fr;
   }
 }

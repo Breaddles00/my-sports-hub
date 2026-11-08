@@ -11,6 +11,7 @@ import News from './components/News.jsx';
 import GameDetail from './components/GameDetail.jsx';
 import Settings from './components/Settings.jsx';
 import { TeamDetail, TeamsGrid } from './components/Teams.jsx';
+import { useSeasonCountdowns } from './components/SeasonCountdown.jsx';
 
 // Polls the current slate of every league (powers Home, sidebar badges and notifications).
 async function fetchHub() {
@@ -136,6 +137,7 @@ export default function App() {
   const [leagueTab, setLeagueTab] = useState('scores');
   const hub = usePoll(fetchHub, 'hub', { isLive: (d) => Object.values(d).some((x) => x.events?.some((e) => e.state === 'in')) });
   useScoreAlerts(hub.data);
+  const seasons = useSeasonCountdowns(hub.data);
 
   const visible = LEAGUES.filter((l) => !settings.hiddenLeagues.includes(l.id));
   const liveCount = (id) => (hub.data?.[id]?.events || []).filter((e) => e.state === 'in').length;
@@ -208,8 +210,8 @@ export default function App() {
         </nav>
 
         <main className="main">
-          {view === 'home' && <Home hub={hub} onNavigate={go} />}
-          {view === 'starred' && <Starred hub={hub} />}
+          {view === 'home' && <Home hub={hub} seasons={seasons} onNavigate={go} />}
+          {view === 'starred' && <Starred hub={hub} seasons={seasons} />}
           {view === 'settings' && <Settings />}
           {lg && (
             <div className="league-view" style={{ '--lg': lg.accent }}>
@@ -221,7 +223,7 @@ export default function App() {
                 </div>
                 <Tabs tabs={LEAGUE_TABS} value={leagueTab} onChange={setLeagueTab} />
               </div>
-              {leagueTab === 'scores' && <Scoreboard key={lg.id} lg={lg} />}
+              {leagueTab === 'scores' && <Scoreboard key={lg.id} lg={lg} season={seasons[lg.id]} />}
               {leagueTab === 'standings' && <Standings key={lg.id} lg={lg} />}
               {leagueTab === 'teams' && <TeamsGrid key={lg.id} lg={lg} />}
               {leagueTab === 'news' && <News key={lg.id} lg={lg} />}

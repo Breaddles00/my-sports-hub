@@ -137,6 +137,14 @@ export async function getScoreboard(lg, { date, week, seasontype } = {}) {
     week: data.week?.number ?? null,
     seasonType,
     seasonYear: data.season?.year ?? league.season?.year ?? null,
+    // ESPN's window for the current season, used to spot the off-season (see seasonPhase()).
+    season: {
+      year: num(league.season?.year ?? data.season?.year) || null,
+      name: league.season?.displayName || '',
+      type: num(data.season?.type ?? league.season?.type?.type) || null,
+      start: league.season?.startDate || null,
+      end: league.season?.endDate || null,
+    },
     calendar: league.calendar || [],
     calendarType: league.calendarType || null,
     leagueName: league.name || lg.full,
@@ -954,3 +962,161 @@ const mapArticle = (a) => ({
     .map((c) => String(c.teamId ?? c.team?.id ?? ''))
     .filter(Boolean),
 });
+
+// ---------- off-season countdown ----------
+// When a league's season is over (or still in preseason), find when the next regular
+// season starts. ESPN's core API has each season's windows (preseason, regular season,
+// postseason, off-season) once the season is created; the first real game comes from the
+// scoreboard (or Squiggle for the AFL) once the schedule is published.
+const CORE = 'https://sports.core.api.espn.com/v2/sports';
+const DAY_MS = 86400000;
+const ms = (s) => (s ? Date.parse(s) : NaN);
+
+// 'pre' (preseason, regular season still to come), 'in', or 'off' (season finished).
+// ESPN keeps showing the last game day for a while after a season ends (MLB showed the
+// World Series for weeks), so a postseason slate whose newest game is 3+ days old also
+// counts as over. Regular-season breaks (All-Star, Olympics) never do.
+export function seasonPhase(sb, now = Date.now()) {
+  const s = sb?.season;
+  if (!s || sb.error) return null;
+  const evs = sb.events || [];
+  if (evs.some((e) => e.state === 'in')) return 'in';
+  if (s.type === 4 || ms(s.end) < now) return 'off';
+  const upcoming = evs.some((e) => e.state === 'pre' && ms(e.date) > now - 6 * 3600 * 1000);
+  const newest = Math.max(...evs.map((e) => ms(e.date)).filter((t) => !Number.isNaN(t)));
+  if (evs.length && !upcoming && s.type >= 3 && now - newest > 3 * DAY_MS) return 'off';
+  if (s.type === 1) return 'pre';
+  return 'in';
+}
+
+// The season after `name`: "2026" -> "2027", "2026-27" -> "2027-28".
+const nextSeasonName = (name, year) => {
+  const m = /^(\d{4})-(\d{2})$/.exec(name || '');
+  if (m) return `${+m[1] + 1}-${String((+m[2] + 1) % 100).padStart(2, '0')}`;
+  return String(year + 1);
+};
+
+// Core API season: { year, name, pre: {start,end}, reg: {start,end}, off: {start,end} }, or null if ESPN hasn't created it.
+const coreSeasonCache = new Map();
+function getCoreSeason(lg, year) {
+  const key = `${lg.id}:${year}`;
+  const hit = coreSeasonCache.get(key);
+  if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.p;
+  const p = getJSON(`${CORE}/${lg.sport}/leagues/${lg.league}/seasons/${year}`)
+    .then((d) => {
+      const types = {};
+      (d.types?.items || []).forEach((t) => {
+        types[String(t.type ?? t.id)] = { start: t.startDate || null, end: t.endDate || null, name: t.name || '' };
+      });
+      return { year, name: d.displayName || String(year), start: d.startDate, pre: types['1'] || null, reg: types['2'] || null, off: types['4'] || null };
+    })
+    .catch((e) => {
+      if (/404/.test(e.message)) return null; // season not created yet
+      coreSeasonCache.delete(key);
+      throw e;
+    });
+  coreSeasonCache.set(key, { t: Date.now(), p });
+  return p;
+}
+
+const tbdTime = (e) => /TBD|TBA/i.test(e.detail || '');
+// ESPN stamps games with no start time at midnight US Eastern. Keep that calendar day,
+// as local noon, so it doesn't show as the day before west of New York.
+const tbdDay = (iso) => {
+  const day = new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // YYYY-MM-DD
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T12:00:00`).toISOString() : iso;
+};
+const earliest = (evs) => evs.sort((a, b) => ms(a.date) - ms(b.date))[0] || null;
+
+// First regular-season game on or after `from` (an ISO date), from ESPN's scoreboard.
+// Football: week 1 of the season year. Others: the month(s) the regular season starts in
+// (ESPN ignores date ranges but takes a whole month, YYYYMM).
+async function firstEspnGame(lg, year, from) {
+  if (lg.mode === 'week') {
+    const d = await getJSON(`${site(lg)}/scoreboard`, { ...(lg.scoreboardParams || {}), seasontype: 2, week: 1, dates: year });
+    return earliest((d.events || []).map((e) => normalizeEvent(e, lg)));
+  }
+  if (!from) return null;
+  const start = ms(from) - DAY_MS;
+  const months = [...new Set([0, 21].map((k) => ymd(new Date(start + k * DAY_MS)).slice(0, 6)))];
+  for (const m of months) {
+    const d = await getJSON(`${site(lg)}/scoreboard`, { ...(lg.scoreboardParams || {}), dates: m, limit: 1000 });
+    const reg = (d.events || []).map((e) => normalizeEvent(e, lg)).filter((e) => e.seasonType === 2 && ms(e.date) >= start);
+    if (reg.length) return earliest(reg);
+  }
+  return null;
+}
+
+// AFL: Squiggle's fixture has the Opening Round as soon as the season is fixtured.
+async function firstAflGame(year) {
+  const season = await getAflSeason(year);
+  const r = season.rounds.filter((x) => !x.final).sort((a, b) => a.first - b.first)[0];
+  return r ? { date: new Date(r.first).toISOString(), round: r.name } : null;
+}
+
+async function findNextSeason(lg, sb, phase) {
+  const now = Date.now();
+  const cur = sb.season.year;
+  const [thisSeason, nextSeason] = await Promise.all([getCoreSeason(lg, cur).catch(() => null), getCoreSeason(lg, cur + 1).catch(() => null)]);
+  // The season we're counting down to: the first whose regular season hasn't started.
+  const target = [thisSeason, nextSeason].find((s) => s?.reg?.start && ms(s.reg.start) > now) || null;
+  const year = target?.year ?? (phase === 'pre' ? cur : cur + 1);
+  const out = {
+    phase,
+    year,
+    name: target?.name || (phase === 'pre' ? sb.season.name || String(cur) : nextSeasonName(sb.season.name, cur)),
+    opener: null, // { date, exact, timeTbd, label }
+    preseason: target?.pre?.start && ms(target.pre.start) > now ? { date: target.pre.start, name: target.pre.name } : null,
+    lastGame: null,
+  };
+  if (phase === 'off') {
+    const done = (sb.events || []).filter((e) => e.state === 'post');
+    out.lastGame = done.length ? done.reduce((a, b) => (ms(b.date) > ms(a.date) ? b : a)).date : null;
+  }
+
+  // When this off-season ends: roughly when the next preseason starts.
+  let offEnd = thisSeason?.off?.end || (sb.calendar || []).find((c) => c && String(c.value) === '4')?.endDate || null;
+  if (!(ms(offEnd) > now)) offEnd = null;
+
+  // An exact first game, if the schedule is out.
+  const tries = [];
+  if (lg.id === 'afl') tries.push(() => firstAflGame(year));
+  tries.push(() => firstEspnGame(lg, year, target?.reg?.start || offEnd));
+  for (const t of tries) {
+    const g = await t().catch(() => null);
+    if (g && ms(g.date) > now - 6 * 3600 * 1000) {
+      const timeTbd = !!g.detail && tbdTime(g);
+      out.opener = { date: timeTbd ? tbdDay(g.date) : g.date, exact: true, timeTbd, game: g.shortName || g.name || '', round: g.round || '' };
+      return out;
+    }
+  }
+  // Otherwise ESPN's regular-season window (approximate: it starts at a US midnight). If
+  // ESPN hasn't created the season yet, guess a year on from this season's start, and
+  // failing that use the end of this off-season (roughly when the next preseason starts).
+  if (target?.reg?.start) {
+    out.opener = { date: target.reg.start, exact: false };
+    return out;
+  }
+  const guess = thisSeason?.reg?.start ? new Date(ms(thisSeason.reg.start)) : null;
+  if (guess) guess.setFullYear(guess.getFullYear() + 1);
+  if (guess && guess.getTime() > now) out.opener = { date: guess.toISOString(), exact: false, guessed: true };
+  else if (offEnd) out.opener = { date: offEnd, exact: false, offSeasonEnd: true };
+  return out;
+}
+
+// Countdown info for a league from its current scoreboard (the Home poller's data), or
+// null while the league is in season. Cached for 6 hours per league and phase.
+const countdownCache = new Map();
+export function getSeasonCountdown(lg, sb) {
+  const phase = seasonPhase(sb);
+  if (phase !== 'off' && phase !== 'pre') return Promise.resolve(null);
+  const key = `${lg.id}|${phase}|${sb.season.year}`;
+  const hit = countdownCache.get(key);
+  if (hit && Date.now() - hit.t < 6 * 3600 * 1000) return hit.p;
+  const p = findNextSeason(lg, sb, phase).catch((e) => {
+    countdownCache.delete(key);
+    throw e;
+  });
+  countdownCache.set(key, { t: Date.now(), p });
+  return p;
+}

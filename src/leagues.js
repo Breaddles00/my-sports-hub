@@ -18,6 +18,7 @@ const FOOTBALL_KEY_STATS = [
 export const LEAGUES = [
   {
     id: 'nfl',
+    opener: 'Kickoff', // first day of the regular season (off-season countdown)
     name: 'NFL',
     full: 'National Football League',
     sport: 'football',
@@ -33,6 +34,7 @@ export const LEAGUES = [
   },
   {
     id: 'ncaaf',
+    opener: 'Kickoff', // first day of the regular season (off-season countdown)
     name: 'NCAAF',
     full: 'NCAA Football (FBS)',
     sport: 'football',
@@ -51,6 +53,7 @@ export const LEAGUES = [
   },
   {
     id: 'mlb',
+    opener: 'Opening Day', // first day of the regular season (off-season countdown)
     name: 'MLB',
     full: 'Major League Baseball',
     sport: 'baseball',
@@ -75,6 +78,7 @@ export const LEAGUES = [
   },
   {
     id: 'nba',
+    opener: 'Opening Night', // first day of the regular season (off-season countdown)
     name: 'NBA',
     full: 'National Basketball Association',
     sport: 'basketball',
@@ -99,6 +103,7 @@ export const LEAGUES = [
   },
   {
     id: 'nhl',
+    opener: 'Opening Night', // first day of the regular season (off-season countdown)
     name: 'NHL',
     full: 'National Hockey League',
     sport: 'hockey',
@@ -123,6 +128,7 @@ export const LEAGUES = [
   },
   {
     id: 'afl',
+    opener: 'Season opener', // first day of the regular season (off-season countdown)
     name: 'AFL',
     full: 'Australian Football League',
     sport: 'australian-football',
