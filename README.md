@@ -20,7 +20,7 @@ The same app also runs in a browser: **https://breaddles00.github.io/my-sports-h
 - **Starred teams and settings are kept separately** on each device and browser.
 - **Notifications** only arrive while the site is open. On iPhone they need the home-screen version.
 - The site always runs the newest build, so there's no updater. Every push to `main` that changes the UI republishes it ([`web.yml`](.github/workflows/web.yml)).
-- Data comes straight from ESPN and Squiggle in the browser. If they ever block that, [`worker/`](worker/README.md) has a small optional Cloudflare proxy to switch on.
+- Data comes straight from ESPN in the browser. ESPN refuses a few endpoints from browsers: team lists and pages, depth charts, and all of Squiggle. Those need the small Cloudflare proxy in [`worker/`](worker/README.md).
 
 Build it locally with `node scripts/build.mjs --web`. The output goes to `dist-web/`; serve that folder with any static server.
 
