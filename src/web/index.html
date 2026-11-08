@@ -18,6 +18,31 @@
     <link rel="icon" type="image/png" href="icons/icon-192.png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="app.css?v=%BUILD_ID%" />
+    <style>
+      /* Home-screen app (standalone): iOS can report a viewport shorter than the screen (notably iOS 26, and
+         after the keyboard has been open), so 100dvh / 100% leave an empty band under the bottom tab bar.
+         Pin the shell to the screen with position: fixed and size it with 100vh, which is the full screen
+         when there's no browser toolbar. Kept here so it only affects the web build. */
+      @media (display-mode: standalone) and (max-width: 720px) {
+        html,
+        body {
+          background: var(--bg);
+        }
+        html[data-platform='web'] .app {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 100vh;
+          height: max(100vh, 100dvh);
+        }
+        html[data-platform='web'] .drawer-backdrop {
+          bottom: auto;
+          height: 100vh;
+          height: max(100vh, 100dvh);
+        }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
