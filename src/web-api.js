@@ -46,26 +46,23 @@
     }
   }
 
+  // ESPN allows some endpoints from the browser and not others on the same host (e.g. scoreboard yes,
+  // /teams and depth charts no), so the route is remembered per endpoint shape with ids blanked out.
+  const routeKey = (u) => u.hostname + u.pathname.replace(/\/\d+(?=\/|$)/g, '/#');
+
   async function load(parsed) {
-    const host = parsed.hostname;
+    const key = routeKey(parsed);
     const viaProxy = () => fetchJson(`${PROXY}/?url=${encodeURIComponent(parsed.href)}`);
-    if (PROXY && route[host] === 'proxy') return viaProxy();
+    if (PROXY && route[key] === 'proxy') return viaProxy();
     try {
-      const data = await fetchJson(parsed.href);
-      if (route[host] !== 'direct') {
-        route[host] = 'direct';
-        saveRoute();
-      }
-      return data;
+      return await fetchJson(parsed.href);
     } catch (e) {
       // A CORS refusal shows up as a TypeError with no status. HTTP errors and timeouts are real failures.
-      const blocked = !e.http && e.name !== 'AbortError';
-      if (!blocked || !PROXY || route[host] === 'direct') {
-        if (blocked && route[host] !== 'direct') throw new Error(`Network error: offline, or ${host} refused the request`);
-        throw e;
-      }
+      const blocked = !e.http && e.name !== 'AbortError' && navigator.onLine !== false;
+      if (!blocked) throw e;
+      if (!PROXY) throw new Error(`${parsed.hostname} blocks this in the browser until the data proxy is set up (or you're offline)`);
       const data = await viaProxy();
-      route[host] = 'proxy';
+      route[key] = 'proxy';
       saveRoute();
       return data;
     }

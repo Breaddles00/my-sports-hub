@@ -2049,14 +2049,24 @@ td.strong {
   .week-select {
     min-width: 0;
     max-width: 100%;
+    text-overflow: ellipsis;
   }
   .date-nav {
     flex: 1 1 100%;
+    min-width: 0;
+    flex-wrap: wrap;
     justify-content: space-between;
   }
-  .date-label {
+  .date-nav > .muted {
+    display: none;
+  }
+  .date-label,
+  .date-nav .week-select {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 0;
+  }
+  .date-input {
+    max-width: 150px;
   }
   .seg {
     max-width: 100%;
@@ -2126,6 +2136,12 @@ td.strong {
   }
   .gd-score {
     gap: 8px;
+  }
+  .leaders {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .leader {
+    grid-template-columns: 84px minmax(0, 1fr) auto;
   }
   .gd-nums {
     font-size: 34px;
